@@ -163,10 +163,29 @@ const MEMBERS=[
   {name:'吉成',  color:'#0F6E56',bg:'#9FE1CB',text:'#04342C'},
   {name:'真壁',  color:'#993C1D',bg:'#F5C4B3',text:'#4A1B0C'},
   {name:'敏美',  color:'#854F0B',bg:'#FAC775',text:'#412402'},
+  {name:'佐藤',  color:'#2E86AB',bg:'#AED9E0',text:'#1A5276'},
   {name:'下村',  color:'#993556',bg:'#F4C0D1',text:'#4B1528'},
   {name:'縫製',  color:'#534AB7',bg:'#CECBF6',text:'#26215C'},
   {name:'その他',color:'#3B6D11',bg:'#C0DD97',text:'#173404'},
   {name:'休み',  color:'#A32D2D',bg:'#F7C1C1',text:'#501313'},
+];
+
+const ACCOMPANY_MEMBERS=[
+  {name:'穐元',  color:'#185FA5',bg:'#B5D4F4',text:'#042C53'},
+  {name:'吉成',  color:'#0F6E56',bg:'#9FE1CB',text:'#04342C'},
+  {name:'真壁',  color:'#993C1D',bg:'#F5C4B3',text:'#4A1B0C'},
+  {name:'敏美',  color:'#854F0B',bg:'#FAC775',text:'#412402'},
+  {name:'佐藤',  color:'#2E86AB',bg:'#AED9E0',text:'#1A5276'},
+  {name:'下村',  color:'#993556',bg:'#F4C0D1',text:'#4B1528'},
+  {name:'縫製',  color:'#534AB7',bg:'#CECBF6',text:'#26215C'},
+  {name:'ディライト', color:'#6C3483',bg:'#D2B4DE',text:'#4A235A'},
+  {name:'ナンバーエス',color:'#1A5276',bg:'#A9CCE3',text:'#154360'},
+  {name:'ユーユー',   color:'#0E6655',bg:'#A2D9CE',text:'#0B5345'},
+  {name:'フルライン', color:'#7D6608',bg:'#F9E79F',text:'#6D5E07'},
+  {name:'ハンデックス',color:'#784212',bg:'#FAD7A0',text:'#6E2F0E'},
+  {name:'相山',      color:'#1B2631',bg:'#AEB6BF',text:'#17202A'},
+  {name:'その他',    color:'#3B6D11',bg:'#C0DD97',text:'#173404'},
+  {name:'休み',      color:'#A32D2D',bg:'#F7C1C1',text:'#501313'},
 ];
 
 let activeMembers=new Set(MEMBERS.map(m=>m.name));
@@ -365,7 +384,7 @@ function closePopup(){document.getElementById('popup').style.display='none';}
 
 function buildAccompanyGrid(selectedNames,excludeName){
   const grid=document.getElementById('accompany-grid');
-  grid.innerHTML=MEMBERS
+  grid.innerHTML=ACCOMPANY_MEMBERS
     .filter(m=>m.name!==excludeName)
     .map(m=>{
       const checked=selectedNames&&selectedNames.includes(m.name)?'checked':'';
@@ -396,7 +415,7 @@ function toggleAccompany(name){
 }
 
 function getSelectedAccompanies(){
-  return MEMBERS.filter(m=>{
+  return ACCOMPANY_MEMBERS.filter(m=>{
     const cb=document.getElementById('acc-'+m.name);
     return cb&&cb.checked;
   }).map(m=>m.name);
