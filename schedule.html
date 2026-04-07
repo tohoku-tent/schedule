@@ -39,7 +39,7 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f5f
 .cal-cell.today{background:#fffdf0;}
 .cal-cell.today .date-num{background:#c0392b;color:#fff;border-radius:50%;}
 .date-num{font-size:11px;font-weight:700;width:20px;height:20px;display:flex;align-items:center;justify-content:center;margin-bottom:2px;}
-.date-num.sun{color:#c0392b;}.date-num.sat{color:#2471a3;}
+.date-num.sun{color:#c0392b;}.date-num.sat{color:#2471a3;}.date-num.hol{color:#c0392b;}.holiday-name{font-size:8px;color:#c0392b;line-height:1.2;margin-bottom:1px;}
 .ev-rows{display:flex;flex-direction:column;gap:1px;}
 .ev-row{display:flex;align-items:center;gap:2px;min-height:13px;cursor:pointer;padding:0 1px;border-radius:2px;}
 .ev-row:hover{opacity:0.7;}
@@ -198,8 +198,13 @@ let editingId=null;
 function pad(n){return String(n).padStart(2,'0');}
 function setStatus(msg,type=''){const el=document.getElementById('status');el.textContent=msg;el.className='status '+(type||'');}
 
+let holidays={};
+async function loadHolidays(){
+  try{const r=await fetch('https://holidays-jp.github.io/api/v1/date.json');holidays=await r.json();}catch(e){}
+}
+function isHoliday(ds){return holidays[ds]||null;}
 async function loadFromSheet(){
-  setStatus('読込中...','loading');
+  setStatus('読込中...','loading');await loadHolidays();
   try{
     const res=await fetch(GAS_URL);
     const data=await res.json();
@@ -291,9 +296,9 @@ function renderCalendar(){
       const m=c.other?(c.mo<1?12:c.mo>12?1:c.mo):currentMonth;
       const y=c.other?(c.mo<1?currentYear-1:c.mo>12?currentYear+1:currentYear):currentYear;
       const ds=dateStr(y,m,c.day);
-      const isToday=today.getFullYear()===y&&today.getMonth()+1===m&&today.getDate()===c.day;
+      const isToday=today.getFullYear()===y&&today.getMonth()+1===m&&today.getDate()===c.day;const holName=isHoliday(ds);
       const dow=ci%7;
-      const dnCls=dow===0?'sun':dow===6?'sat':'';
+      const dnCls=dow===0?'sun':dow===6?'sat':holName?'hol':'';
 
       let rowsHtml='<div class="ev-rows">';
       for(const mb of visibleMembers){
@@ -335,7 +340,7 @@ function renderCalendar(){
       rowsHtml+='</div>';
 
       body+=`<div class="cal-cell ${c.other?'other-month':''} ${isToday?'today':''}" onclick="showPopup('${ds}',event)">
-        <div class="date-num ${dnCls}">${c.day}</div>
+        <div class="date-num ${dnCls}">${c.day}</div>${holName?`<div class="holiday-name">${holName}</div>`:''}
         ${rowsHtml}
       </div>`;
     }
