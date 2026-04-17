@@ -170,9 +170,10 @@ td.ec.tc:hover{background:#fff3b0;}
         <label><input type="checkbox" value="吉成"> 吉成</label>
         <label><input type="checkbox" value="真壁"> 真壁</label>
         <label><input type="checkbox" value="敏美"> 敏美</label>
-        <label><input type="checkbox" value="下村"> 下村</label>
         <label><input type="checkbox" value="佐藤"> 佐藤</label>
+        <label><input type="checkbox" value="下村"> 下村</label>
         <label><input type="checkbox" value="縫製"> 縫製</label>
+        <label><input type="checkbox" value="服部"> 服部</label>
         <label><input type="checkbox" value="ディライト"> ディライト</label>
         <label><input type="checkbox" value="ナンバーエス"> ナンバーエス</label>
         <label><input type="checkbox" value="ユーユー"> ユーユー</label>
@@ -332,6 +333,14 @@ function renderCalendar(){
     const c=RCOLORS[r];
     return `<div class="li"><div class="ld" style="background:${c.bg};border:1.5px solid ${c.bd}"></div>${r}</div>`;
   }).join('');
+requestAnimationFrame(()=>{
+    const todayTh=document.querySelector('#cal-table th.dh[style*="background:#fffde0"]');
+    if(todayTh){
+      const scroll=document.querySelector('.cal-scroll');
+      const center=todayTh.offsetLeft-(scroll.clientWidth/2)+(todayTh.offsetWidth/2);
+      scroll.scrollLeft=Math.max(0,center);
+    }
+  });
 }
 
 function changeMonth(d){
