@@ -1,0 +1,22 @@
+{
+  "name": "東北テント スケジュール",
+  "short_name": "スケジュール",
+  "description": "東北テント株式会社 社内スケジュール管理アプリ",
+  "start_url": "/schedule/schedule.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "/schedule/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/schedule/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
