@@ -473,7 +473,7 @@ async function handlePhotoFiles(input){
   badge.classList.remove('show');
 }
 
-function compressImage(file,maxW=1200,q=0.75){
+function compressImage(file,maxW=800,q=0.60){
   return new Promise((res,rej)=>{
     const img=new Image();
     const ou=URL.createObjectURL(file);
