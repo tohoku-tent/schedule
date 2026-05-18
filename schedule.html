@@ -21,7 +21,7 @@
   --red:#d94040;--blue:#2563a8;--r:10px;
 }
 body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:16px;}
-#setup-screen{display:flex;align-items:center;justify-content:center;min-height:80vh;}
+#setup-screen{display:none!important;}
 .setup-card{background:var(--surface);border-radius:14px;border:1px solid var(--border-s);padding:32px 36px;max-width:480px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,0.1);}
 .setup-card h2{font-size:18px;font-weight:700;margin-bottom:6px;}
 .setup-card p{font-size:13px;color:var(--mute);margin-bottom:20px;line-height:1.7;}
@@ -283,7 +283,16 @@ const RCOLORS={
   休み:{bg:'#fee2e2',bd:'#ef4444'},
 };
 const DJP=['日','月','火','水','木','金','土'];
-const CFG_KEY='schedule_firebase_cfg_v1';
+
+// Firebase設定（自動接続）
+const FIREBASE_CFG={
+  apiKey:"AIzaSyCy7daNAmQVaXUilBXmHTqgDtjm4egAiI4",
+  authDomain:"tohoku-tent-schedule.firebaseapp.com",
+  projectId:"tohoku-tent-schedule",
+  storageBucket:"tohoku-tent-schedule.firebasestorage.app",
+  messagingSenderId:"768628959239",
+  appId:"1:768628959239:web:2ea57e08e12f9b2ae122a2"
+};
 
 const _today=new Date();
 let curYear=_today.getFullYear(),curMonth=_today.getMonth()+1;
@@ -292,33 +301,18 @@ let editingId=null,db=null,events={},photos={},unsub=null,unsubPhotos=null;
 // ---- 写真ライトボックス用 ----
 let lbPhotos=[],lbIdx=0;
 
-function loadConfig(){try{return JSON.parse(localStorage.getItem(CFG_KEY));}catch(e){return null;}}
-
-function saveConfig(){
-  const cfg={
-    apiKey:document.getElementById('cfg-apikey').value.trim(),
-    authDomain:document.getElementById('cfg-authdomain').value.trim(),
-    projectId:document.getElementById('cfg-projectid').value.trim(),
-    appId:document.getElementById('cfg-appid').value.trim(),
-  };
-  if(!cfg.apiKey||!cfg.projectId){alert('API KeyとProject IDは必須です');return;}
-  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));
-  initFirebase(cfg);
-}
-
 function resetConfig(){
-  if(!confirm('設定をリセットして初回設定画面に戻りますか？'))return;
+  if(!confirm('データを再読み込みしますか？'))return;
   if(unsub)unsub();
   if(unsubPhotos)unsubPhotos();
-  localStorage.removeItem(CFG_KEY);
-  document.getElementById('main-screen').style.display='none';
-  document.getElementById('setup-screen').style.display='flex';
+  location.reload();
 }
 
 function initFirebase(cfg){
   try{
-    if(firebase.apps.length){firebase.app().delete();}
-    firebase.initializeApp(cfg);
+    if(firebase.apps.length===0){
+      firebase.initializeApp(cfg);
+    }
     db=firebase.firestore();
     document.getElementById('setup-screen').style.display='none';
     document.getElementById('main-screen').style.display='block';
@@ -627,15 +621,8 @@ document.getElementById('f-date-s').addEventListener('change',function(){
   if(s){eEl.min=s;if(!eEl.value||eEl.value<s)eEl.value='';}
 });
 
-const HARDCODED_CFG={
-  apiKey:'AIzaSyCy7daNAeQVaXUilBXemTogDtjm4egAII4',
-  authDomain:'tohoku-tent-schedule.firebaseapp.com',
-  projectId:'tohoku-tent-schedule',
-  appId:'1:768628959239:web:2ea57e08e12f9b2ae122a2',
-};
-const savedCfg=loadConfig();
-if(savedCfg&&savedCfg.apiKey&&savedCfg.projectId){initFirebase(savedCfg);}
-else{initFirebase(HARDCODED_CFG);}
+// 自動接続
+initFirebase(FIREBASE_CFG);
 </script>
 </body>
 </html>
