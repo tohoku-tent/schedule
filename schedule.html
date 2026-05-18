@@ -98,6 +98,32 @@ td.ec.tc:hover{background:#fff3b0;}
 #loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,0.7);z-index:300;align-items:center;justify-content:center;font-size:14px;color:var(--mute);}
 #loading.show{display:flex;}
 @media(max-width:600px){body{padding:8px;}.hd-ttl{display:none;}.hd-mo{font-size:20px;}}
+
+/* ========== 写真行 追加スタイル ========== */
+td.pc{height:54px;padding:3px;vertical-align:middle;background:#f9fbe7;cursor:pointer;position:relative;}
+td.pc:hover{background:#f0f4e0;}
+td.pc.tc{background:#fffde0;}
+td.pc:hover::after{content:'📷';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px;opacity:0.25;pointer-events:none;}
+td.rh.photo-rh{background:#e8f5e9;color:#2e7d32;font-size:10px;line-height:1.4;}
+.ph-thumbs{display:flex;gap:2px;align-items:center;flex-wrap:nowrap;overflow:hidden;}
+.ph-thumb{width:44px;height:44px;object-fit:cover;border-radius:4px;border:1.5px solid #c8e6c9;cursor:pointer;transition:transform .15s,box-shadow .15s;flex-shrink:0;}
+.ph-thumb:hover{transform:scale(1.1);box-shadow:0 2px 8px rgba(0,0,0,.25);}
+.ph-more{display:inline-flex;align-items:center;justify-content:center;width:30px;height:44px;background:#b2dfdb;border-radius:4px;font-size:11px;font-weight:700;color:#004d40;cursor:pointer;flex-shrink:0;}
+.ph-more:hover{background:#80cbc4;}
+/* 写真ライトボックス */
+#photo-lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:10px;}
+#photo-lb.open{display:flex;}
+#photo-lb .plb-img{max-width:92vw;max-height:76vh;border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.6);}
+#photo-lb .plb-cap{color:#fff;font-size:13px;text-align:center;}
+#photo-lb .plb-close{position:fixed;top:14px;right:18px;color:#fff;font-size:32px;cursor:pointer;line-height:1;z-index:501;}
+#photo-lb .plb-del{background:#ef4444;color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;cursor:pointer;font-family:inherit;}
+#photo-lb .plb-del:hover{background:#dc2626;}
+#photo-lb .plb-nav{display:flex;gap:10px;align-items:center;}
+#photo-lb .plb-arr{color:#fff;font-size:40px;cursor:pointer;padding:0 8px;user-select:none;}
+#photo-lb .plb-arr:hover{color:#ccc;}
+/* アップロード中 */
+.uploading-badge{position:fixed;bottom:20px;right:20px;background:#22c55e;color:#fff;border-radius:20px;padding:6px 16px;font-size:12px;z-index:600;display:none;}
+.uploading-badge.show{display:block;}
 </style>
 </head>
 <body>
@@ -137,7 +163,6 @@ td.ec.tc:hover{background:#fff3b0;}
       </table>
     </div>
     <div class="board-footer">
-      
       <div class="legend" id="legend"></div>
       <div style="margin-left:auto;">
         <button class="btn-nav" style="font-size:11px;color:var(--hint);" onclick="resetConfig()">⚙ 設定変更</button>
@@ -146,6 +171,7 @@ td.ec.tc:hover{background:#fff3b0;}
   </div>
 </div>
 
+<!-- 予定追加モーダル -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
     <h3 id="modal-title">予定を追加</h3>
@@ -203,6 +229,23 @@ td.ec.tc:hover{background:#fff3b0;}
   </div>
 </div>
 
+<!-- 写真ライトボックス -->
+<div id="photo-lb">
+  <span class="plb-close" onclick="closeLB()">×</span>
+  <div class="plb-nav">
+    <span class="plb-arr" id="plb-prev" onclick="lbNav(-1)">‹</span>
+    <img class="plb-img" id="plb-img" src="" alt="">
+    <span class="plb-arr" id="plb-next" onclick="lbNav(1)">›</span>
+  </div>
+  <div class="plb-cap" id="plb-cap"></div>
+  <button class="plb-del" onclick="deleteCurrentPhoto()">🗑 この写真を削除</button>
+  <div style="color:#888;font-size:11px;margin-top:2px;">タップで閉じる　Esc で閉じる</div>
+</div>
+
+<!-- 隠しファイルinput -->
+<input type="file" id="photo-file-input" accept="image/*" multiple style="display:none" onchange="handlePhotoFiles(this)">
+
+<div class="uploading-badge" id="uploading-badge">📤 アップロード中...</div>
 <div class="tooltip" id="tooltip"></div>
 <div id="loading"><span>処理中...</span></div>
 
@@ -242,7 +285,12 @@ const RCOLORS={
 const DJP=['日','月','火','水','木','金','土'];
 const CFG_KEY='schedule_firebase_cfg_v1';
 
-const _today=new Date();let curYear=_today.getFullYear(),curMonth=_today.getMonth()+1,editingId=null,db=null,events={},unsub=null;
+const _today=new Date();
+let curYear=_today.getFullYear(),curMonth=_today.getMonth()+1;
+let editingId=null,db=null,events={},photos={},unsub=null,unsubPhotos=null;
+
+// ---- 写真ライトボックス用 ----
+let lbPhotos=[],lbIdx=0;
 
 function loadConfig(){try{return JSON.parse(localStorage.getItem(CFG_KEY));}catch(e){return null;}}
 
@@ -261,6 +309,7 @@ function saveConfig(){
 function resetConfig(){
   if(!confirm('設定をリセットして初回設定画面に戻りますか？'))return;
   if(unsub)unsub();
+  if(unsubPhotos)unsubPhotos();
   localStorage.removeItem(CFG_KEY);
   document.getElementById('main-screen').style.display='none';
   document.getElementById('setup-screen').style.display='flex';
@@ -283,13 +332,21 @@ function initFirebase(cfg){
 
 function startListener(){
   if(unsub)unsub();
+  if(unsubPhotos)unsubPhotos();
   setStatus('読込中...','');
+  // 予定リスナー
   unsub=db.collection('schedule_events').onSnapshot(snap=>{
     events={};
     snap.forEach(doc=>{events[doc.id]={...doc.data(),id:doc.id};});
     renderCalendar();
     setStatus('● リアルタイム同期中','ok');
   },err=>{setStatus('⚠ 接続エラー: '+err.message,'err');});
+  // 写真リスナー
+  unsubPhotos=db.collection('photos').onSnapshot(snap=>{
+    photos={};
+    snap.forEach(doc=>{photos[doc.id]={...doc.data(),id:doc.id};});
+    renderCalendar();
+  },()=>{});
 }
 
 function setStatus(msg,cls){const el=document.getElementById('status-bar');el.textContent=msg;el.className=cls;}
@@ -306,6 +363,8 @@ function renderCalendar(){
   document.getElementById('disp-month').textContent=curMonth+'月';
   const today=todayStr();
   const evArr=Object.values(events);
+  const phArr=Object.values(photos);
+
   let html='<thead><tr><th class="rh-top"></th>';
   for(let d=1;d<=days;d++){
     const dow=getDow(curYear,curMonth,d);
@@ -317,6 +376,8 @@ function renderCalendar(){
     html+=`<th class="dh"${tb}><span class="dn ${sc2}">${d}</span><span class="dw ${sc2}">${DJP[dow]}</span></th>`;
   }
   html+='</tr></thead><tbody>';
+
+  // 予定行
   for(const row of ROWS){
     html+=`<tr><td class="rh">${row}</td>`;
     for(let d=1;d<=days;d++){
@@ -334,13 +395,39 @@ function renderCalendar(){
     }
     html+='</tr>';
   }
+
+  // ★ 写真行（休みの下に追加）
+  html+=`<tr><td class="rh photo-rh">📷<br>写真</td>`;
+  for(let d=1;d<=days;d++){
+    const ds=toDS(curYear,curMonth,d);
+    const tc=ds===today?' tc':'';
+    const dayPhotos=phArr.filter(p=>p.dateKey===ds);
+    html+=`<td class="pc${tc}" onclick="pickPhotoForDate('${ds}')">`;
+    if(dayPhotos.length>0){
+      html+=`<div class="ph-thumbs" onclick="event.stopPropagation()">`;
+      const show=dayPhotos.slice(0,2);
+      show.forEach(p=>{
+        const safeUrl=p.url?p.url.replace(/'/g,"\\'"):'';
+        const safeName=(p.name||'').replace(/'/g,"\\'");
+        html+=`<img class="ph-thumb" src="${safeUrl}" onclick="openLB('${p.id}','${ds}')" title="${safeName}">`;
+      });
+      if(dayPhotos.length>2){
+        html+=`<span class="ph-more" onclick="openLB('${dayPhotos[2].id}','${ds}')">+${dayPhotos.length-2}</span>`;
+      }
+      html+=`</div>`;
+    }
+    html+='</td>';
+  }
+  html+='</tr>';
+
   html+='</tbody>';
   document.getElementById('cal-table').innerHTML=html;
   document.getElementById('legend').innerHTML=ROWS.map(r=>{
     const c=RCOLORS[r];
     return `<div class="li"><div class="ld" style="background:${c.bg};border:1.5px solid ${c.bd}"></div>${r}</div>`;
-  }).join('');
-requestAnimationFrame(()=>{
+  }).join('')+`<div class="li"><div class="ld" style="background:#e8f5e9;border:1.5px solid #22c55e"></div>📷写真</div>`;
+
+  requestAnimationFrame(()=>{
     const todayTh=document.querySelector('#cal-table th.dh[style*="background:#fffde0"]');
     if(todayTh){
       const scroll=document.querySelector('.cal-scroll');
@@ -357,6 +444,102 @@ function changeMonth(d){
   renderCalendar();
 }
 
+// ---- 写真機能 ----
+let pendingDate='';
+
+function pickPhotoForDate(ds){
+  pendingDate=ds;
+  const input=document.getElementById('photo-file-input');
+  input.value='';
+  input.click();
+}
+
+async function handlePhotoFiles(input){
+  const files=Array.from(input.files).filter(f=>f.type.startsWith('image/'));
+  if(!files.length||!pendingDate)return;
+  const badge=document.getElementById('uploading-badge');
+  badge.classList.add('show');
+  try{
+    for(const file of files){
+      const url=await compressImage(file);
+      await db.collection('photos').add({
+        url,
+        name:file.name,
+        dateKey:pendingDate,
+        timestamp:Date.now(),
+      });
+    }
+  }catch(e){alert('写真の保存に失敗しました: '+e.message);}
+  badge.classList.remove('show');
+}
+
+function compressImage(file,maxW=1200,q=0.75){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    const ou=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(ou);
+      const c=document.createElement('canvas');
+      let w=img.width,h=img.height;
+      if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+      c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      res(c.toDataURL('image/jpeg',q));
+    };
+    img.onerror=rej;
+    img.src=ou;
+  });
+}
+
+function openLB(photoId,ds){
+  const phArr=Object.values(photos).filter(p=>p.dateKey===ds);
+  lbPhotos=phArr;
+  lbIdx=phArr.findIndex(p=>p.id===photoId);
+  if(lbIdx<0)lbIdx=0;
+  showLBPhoto();
+  document.getElementById('photo-lb').classList.add('open');
+}
+
+function showLBPhoto(){
+  const p=lbPhotos[lbIdx];
+  if(!p)return;
+  document.getElementById('plb-img').src=p.url||'';
+  document.getElementById('plb-cap').textContent=(p.name||'')+'　'+(lbIdx+1)+' / '+lbPhotos.length;
+  document.getElementById('plb-prev').style.visibility=lbIdx>0?'visible':'hidden';
+  document.getElementById('plb-next').style.visibility=lbIdx<lbPhotos.length-1?'visible':'hidden';
+}
+
+function lbNav(dir){
+  lbIdx+=dir;
+  if(lbIdx<0)lbIdx=0;
+  if(lbIdx>=lbPhotos.length)lbIdx=lbPhotos.length-1;
+  showLBPhoto();
+}
+
+function closeLB(){document.getElementById('photo-lb').classList.remove('open');}
+
+async function deleteCurrentPhoto(){
+  const p=lbPhotos[lbIdx];
+  if(!p)return;
+  if(!confirm('この写真を削除しますか？'))return;
+  try{
+    await db.collection('photos').doc(p.id).delete();
+    closeLB();
+  }catch(e){alert('削除に失敗しました: '+e.message);}
+}
+
+document.getElementById('photo-lb').addEventListener('click',function(e){
+  if(e.target===this)closeLB();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeLB();
+  if(document.getElementById('photo-lb').classList.contains('open')){
+    if(e.key==='ArrowLeft')lbNav(-1);
+    if(e.key==='ArrowRight')lbNav(1);
+  }
+});
+
+// ---- 予定モーダル ----
 function openModalCell(person,date){
   editingId=null;
   document.getElementById('modal-title').textContent='予定を追加';
@@ -438,14 +621,10 @@ function moveTip(e){tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY+
 function hideTip(){tip.style.display='none';}
 document.addEventListener('mousemove',e=>{if(tip.style.display==='block')moveTip(e);});
 document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
-
 document.getElementById('f-date-s').addEventListener('change',function(){
   const s=this.value;
   const eEl=document.getElementById('f-date-e');
-  if(s){
-    eEl.min=s;
-    if(!eEl.value||eEl.value<s) eEl.value='';
-  }
+  if(s){eEl.min=s;if(!eEl.value||eEl.value<s)eEl.value='';}
 });
 
 const HARDCODED_CFG={
