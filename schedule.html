@@ -498,7 +498,25 @@ function showLBPhoto(){
   const p=lbPhotos[lbIdx];
   if(!p)return;
   document.getElementById('plb-img').src=p.url||'';
-  document.getElementById('plb-cap').textContent=(p.name||'')+'　'+(lbIdx+1)+' / '+lbPhotos.length;
+  // キャプション
+  const capEl=document.getElementById('plb-cap');
+  capEl.textContent=(p.name||'')+(lbPhotos.length>1?'　'+( lbIdx+1)+' / '+lbPhotos.length:'');
+  // ドットインジケーター
+  let dotEl=document.getElementById('plb-dots');
+  if(!dotEl){
+    dotEl=document.createElement('div');
+    dotEl.id='plb-dots';
+    dotEl.style.cssText='display:flex;gap:6px;justify-content:center;margin-top:4px;';
+    capEl.after(dotEl);
+  }
+  if(lbPhotos.length>1){
+    dotEl.innerHTML=lbPhotos.map((_,i)=>
+      `<span style="width:8px;height:8px;border-radius:50%;background:${i===lbIdx?'#fff':'rgba(255,255,255,0.35)'};display:inline-block;transition:background .2s;"></span>`
+    ).join('');
+    dotEl.style.display='flex';
+  }else{
+    dotEl.style.display='none';
+  }
   document.getElementById('plb-prev').style.visibility=lbIdx>0?'visible':'hidden';
   document.getElementById('plb-next').style.visibility=lbIdx<lbPhotos.length-1?'visible':'hidden';
 }
@@ -532,6 +550,27 @@ document.addEventListener('keydown',e=>{
     if(e.key==='ArrowRight')lbNav(1);
   }
 });
+
+// ---- タッチスワイプ対応 ----
+(function(){
+  let tx=0,ty=0,dragging=false;
+  const lb=document.getElementById('photo-lb');
+  lb.addEventListener('touchstart',e=>{
+    tx=e.touches[0].clientX;
+    ty=e.touches[0].clientY;
+    dragging=true;
+  },{passive:true});
+  lb.addEventListener('touchend',e=>{
+    if(!dragging)return;
+    dragging=false;
+    const dx=e.changedTouches[0].clientX-tx;
+    const dy=e.changedTouches[0].clientY-ty;
+    if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>40){
+      if(dx<0)lbNav(1);   // 左スワイプ → 次
+      else     lbNav(-1);  // 右スワイプ → 前
+    }
+  },{passive:true});
+})();
 
 // ---- 予定モーダル ----
 function openModalCell(person,date){
