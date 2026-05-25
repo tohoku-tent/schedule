@@ -149,8 +149,8 @@ td.rh.photo-rh{background:#e8f5e9;color:#2e7d32;font-size:10px;line-height:1.4;}
   <div id="status-bar">接続中...</div>
   <div class="board">
     <div class="bh">
-      <span class="hd-yr" id="disp-year">2026</span>
-      <span class="hd-mo" id="disp-month">3月</span>
+      <span class="hd-yr" id="disp-year"></span>
+      <span class="hd-mo" id="disp-month"></span>
       <span class="hd-ttl">予　定　表</span>
       <div class="hd-nav">
         <button class="btn-nav" onclick="changeMonth(-1)">&#8249; 前月</button>
@@ -296,6 +296,8 @@ const FIREBASE_CFG={
 
 const _today=new Date();
 let curYear=_today.getFullYear(),curMonth=_today.getMonth()+1;
+document.getElementById('disp-year').textContent=curYear;
+document.getElementById('disp-month').textContent=curMonth+'月';
 let editingId=null,db=null,events={},photos={},unsub=null,unsubPhotos=null;
 
 // ---- 写真ライトボックス用 ----
