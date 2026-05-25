@@ -357,7 +357,7 @@ function renderCalendar(){
   document.getElementById('disp-month').textContent=curMonth+'月';
   const today=todayStr();
   const evArr=Object.values(events);
-  const phArr=Object.values(photos);
+  const phArr=Object.values(photos).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
 
   let html='<thead><tr><th class="rh-top"></th>';
   for(let d=1;d<=days;d++){
@@ -486,7 +486,9 @@ function compressImage(file,maxW=800,q=0.60){
 }
 
 function openLB(photoId,ds){
-  const phArr=Object.values(photos).filter(p=>p.dateKey===ds);
+  const phArr=Object.values(photos)
+    .filter(p=>p.dateKey===ds)
+    .sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
   lbPhotos=phArr;
   lbIdx=phArr.findIndex(p=>p.id===photoId);
   if(lbIdx<0)lbIdx=0;
@@ -536,7 +538,14 @@ async function deleteCurrentPhoto(){
   if(!confirm('この写真を削除しますか？'))return;
   try{
     await db.collection('photos').doc(p.id).delete();
-    closeLB();
+    // 削除後：残りの写真があればそのまま表示、なければ閉じる
+    lbPhotos.splice(lbIdx,1);
+    if(lbPhotos.length===0){
+      closeLB();
+    }else{
+      if(lbIdx>=lbPhotos.length)lbIdx=lbPhotos.length-1;
+      showLBPhoto();
+    }
   }catch(e){alert('削除に失敗しました: '+e.message);}
 }
 
