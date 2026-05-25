@@ -110,6 +110,9 @@ td.rh.photo-rh{background:#e8f5e9;color:#2e7d32;font-size:10px;line-height:1.4;}
 .ph-thumb:hover{transform:scale(1.1);box-shadow:0 2px 8px rgba(0,0,0,.25);}
 .ph-more{display:inline-flex;align-items:center;justify-content:center;width:30px;height:44px;background:#b2dfdb;border-radius:4px;font-size:11px;font-weight:700;color:#004d40;cursor:pointer;flex-shrink:0;}
 .ph-more:hover{background:#80cbc4;}
+.ph-add{display:inline-flex;align-items:center;justify-content:center;width:26px;height:44px;background:transparent;border:1.5px dashed #aaa;border-radius:4px;font-size:16px;color:#aaa;cursor:pointer;flex-shrink:0;transition:all .15s;}
+.ph-add:hover{border-color:#66bb6a;color:#66bb6a;background:#f1f8e9;}
+td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
 /* 写真ライトボックス */
 #photo-lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:10px;}
 #photo-lb.open{display:flex;}
@@ -398,9 +401,9 @@ function renderCalendar(){
     const ds=toDS(curYear,curMonth,d);
     const tc=ds===today?' tc':'';
     const dayPhotos=phArr.filter(p=>p.dateKey===ds);
-    html+=`<td class="pc${tc}" onclick="pickPhotoForDate('${ds}')">`;
+    html+=`<td class="pc${tc}">`;
     if(dayPhotos.length>0){
-      html+=`<div class="ph-thumbs" onclick="event.stopPropagation()">`;
+      html+=`<div class="ph-thumbs">`;
       const show=dayPhotos.slice(0,2);
       show.forEach(p=>{
         const safeUrl=p.url?p.url.replace(/'/g,"\\'"):'';
@@ -410,7 +413,10 @@ function renderCalendar(){
       if(dayPhotos.length>2){
         html+=`<span class="ph-more" onclick="openLB('${dayPhotos[2].id}','${ds}')">+${dayPhotos.length-2}</span>`;
       }
+      html+=`<span class="ph-add" onclick="pickPhotoForDate('${ds}')" title="写真を追加">＋</span>`;
       html+=`</div>`;
+    }else{
+      html+=`<div class="ph-thumbs" onclick="pickPhotoForDate('${ds}')"></div>`;
     }
     html+='</td>';
   }
