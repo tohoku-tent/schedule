@@ -401,22 +401,20 @@ function renderCalendar(){
     const ds=toDS(curYear,curMonth,d);
     const tc=ds===today?' tc':'';
     const dayPhotos=phArr.filter(p=>p.dateKey===ds);
-    html+=`<td class="pc${tc}">`;
+    html+=`<td class="pc${tc}" onclick="pickPhotoForDate('${ds}')">`;
     if(dayPhotos.length>0){
       html+=`<div class="ph-thumbs">`;
       const show=dayPhotos.slice(0,2);
       show.forEach(p=>{
         const safeUrl=p.url?p.url.replace(/'/g,"\\'"):'';
         const safeName=(p.name||'').replace(/'/g,"\\'");
-        html+=`<img class="ph-thumb" src="${safeUrl}" onclick="openLB('${p.id}','${ds}')" title="${safeName}">`;
+        html+=`<img class="ph-thumb" src="${safeUrl}" onclick="event.stopPropagation();openLB('${p.id}','${ds}')" title="${safeName}">`;
       });
       if(dayPhotos.length>2){
-        html+=`<span class="ph-more" onclick="openLB('${dayPhotos[2].id}','${ds}')">+${dayPhotos.length-2}</span>`;
+        html+=`<span class="ph-more" onclick="event.stopPropagation();openLB('${dayPhotos[2].id}','${ds}')">+${dayPhotos.length-2}</span>`;
       }
-      html+=`<span class="ph-add" onclick="pickPhotoForDate('${ds}')" title="写真を追加">＋</span>`;
+      html+=`<span class="ph-add" onclick="event.stopPropagation();pickPhotoForDate('${ds}')" title="写真を追加">＋</span>`;
       html+=`</div>`;
-    }else{
-      html+=`<div class="ph-thumbs" onclick="pickPhotoForDate('${ds}')"></div>`;
     }
     html+='</td>';
   }
