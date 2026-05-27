@@ -99,6 +99,49 @@ td.ec.tc:hover{background:#fff3b0;}
 #loading.show{display:flex;}
 @media(max-width:600px){body{padding:8px;}.hd-ttl{display:none;}.hd-mo{font-size:20px;}}
 
+/* ===== 連絡事項 ===== */
+.notice-board{background:var(--surface);border-radius:var(--r);border:1px solid var(--border-s);box-shadow:0 2px 16px rgba(0,0,0,0.08);overflow:hidden;margin-top:12px;}
+.notice-toggle{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;user-select:none;background:var(--surface);transition:background .15s;}
+.notice-toggle:hover{background:var(--surface2);}
+.notice-toggle-left{display:flex;align-items:center;gap:8px;}
+.notice-toggle-title{font-size:14px;font-weight:700;color:var(--text);}
+.notice-cnt{background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 7px;margin-left:2px;}
+.notice-arrow{font-size:13px;color:var(--hint);transition:transform .25s;}
+.notice-arrow.open{transform:rotate(180deg);}
+.notice-wrap{max-height:0;overflow:hidden;transition:max-height .35s ease;}
+.notice-wrap.open{max-height:1200px;}
+.notice-inner{border-top:1px solid var(--border);padding:12px 14px 14px;}
+.notice-list{display:flex;flex-direction:column;gap:7px;margin-bottom:10px;}
+.n-item{border-radius:8px;padding:9px 32px 9px 12px;position:relative;border:1px solid transparent;}
+.n-item.important{border-left:4px solid #ef4444;background:#fff5f5;border-color:#fecaca;}
+.n-item.info{border-left:4px solid #3b82f6;background:#eff6ff;border-color:#bfdbfe;}
+.n-item.done{border-left:4px solid #10b981;background:#f0fdf4;border-color:#bbf7d0;opacity:0.72;}
+.n-meta{display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;}
+.n-tag{font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;}
+.n-tag.important{background:#fee2e2;color:#dc2626;}
+.n-tag.info{background:#dbeafe;color:#1d4ed8;}
+.n-tag.done{background:#d1fae5;color:#065f46;}
+.n-author{font-size:11px;color:#555;font-weight:500;}
+.n-date{font-size:11px;color:#bbb;margin-left:auto;}
+.n-body{font-size:12px;color:var(--text);line-height:1.65;white-space:pre-wrap;word-break:break-all;}
+.n-del{position:absolute;top:8px;right:10px;font-size:16px;color:#ccc;cursor:pointer;background:none;border:none;line-height:1;padding:2px;}
+.n-del:hover{color:#ef4444;}
+.btn-add-n{width:100%;padding:8px;font-size:12px;background:#f3f0ff;color:#5b21b6;border:1.5px dashed #a78bfa;border-radius:7px;cursor:pointer;font-family:inherit;font-weight:600;transition:background .15s;}
+.btn-add-n:hover{background:#ede9fe;}
+.n-form{background:var(--surface2);border:1px solid var(--border-s);border-radius:8px;padding:11px;margin-top:9px;display:none;}
+.n-form-row{display:flex;gap:7px;margin-bottom:8px;}
+.n-form-row select,.n-form-row input{font-size:12px;font-family:inherit;border:1px solid var(--border-s);border-radius:6px;padding:5px 8px;background:var(--surface);color:var(--text);outline:none;}
+.n-form-row select:focus,.n-form-row input:focus{border-color:#7c3aed;}
+.n-form-row select{min-width:76px;}
+.n-form-row input{flex:1;}
+.n-ta{width:100%;font-size:12px;font-family:inherit;border:1px solid var(--border-s);border-radius:6px;padding:7px;height:64px;resize:vertical;outline:none;background:var(--surface);color:var(--text);margin-bottom:8px;}
+.n-ta:focus{border-color:#7c3aed;}
+.n-form-btns{display:flex;justify-content:flex-end;gap:7px;}
+.n-btn-cancel{font-size:12px;padding:5px 13px;background:var(--surface);border:1px solid var(--border-s);border-radius:6px;cursor:pointer;font-family:inherit;}
+.n-btn-post{font-size:12px;padding:5px 13px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:700;}
+.n-btn-post:hover{background:#6d28d9;}
+.n-empty{text-align:center;color:var(--hint);font-size:12px;padding:12px 0;}
+
 /* ========== 写真行 追加スタイル ========== */
 td.pc{height:54px;padding:3px;vertical-align:middle;background:#f9fbe7;cursor:pointer;position:relative;}
 td.pc:hover{background:#f0f4e0;}
@@ -169,6 +212,41 @@ td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
       <div class="legend" id="legend"></div>
       <div style="margin-left:auto;">
         <button class="btn-nav" style="font-size:11px;color:var(--hint);" onclick="resetConfig()">⚙ 設定変更</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 連絡事項 -->
+<div class="notice-board" id="notice-board" style="display:none;">
+  <div class="notice-toggle" onclick="toggleNotice()">
+    <div class="notice-toggle-left">
+      <span>📢</span>
+      <span class="notice-toggle-title">連絡事項</span>
+      <span class="notice-cnt" id="notice-cnt" style="display:none">0</span>
+    </div>
+    <span class="notice-arrow" id="notice-arrow">▼</span>
+  </div>
+  <div class="notice-wrap" id="notice-wrap">
+    <div class="notice-inner">
+      <div class="notice-list" id="notice-list">
+        <div class="n-empty">連絡事項はまだありません</div>
+      </div>
+      <button class="btn-add-n" onclick="toggleNForm()">＋ 連絡事項を追加</button>
+      <div class="n-form" id="n-form">
+        <div class="n-form-row">
+          <select id="n-tag">
+            <option value="info">連絡</option>
+            <option value="important">重要</option>
+            <option value="done">済み</option>
+          </select>
+          <input type="text" id="n-author" placeholder="名前（例：穐元）" maxlength="10">
+        </div>
+        <textarea class="n-ta" id="n-body" placeholder="連絡内容を入力してください…"></textarea>
+        <div class="n-form-btns">
+          <button class="n-btn-cancel" onclick="toggleNForm()">キャンセル</button>
+          <button class="n-btn-post" onclick="postNotice()">投稿する</button>
+        </div>
       </div>
     </div>
   </div>
@@ -333,6 +411,7 @@ function startListener(){
   if(unsub)unsub();
   if(unsubPhotos)unsubPhotos();
   setStatus('読込中...','');
+  startNoticeListener();
   // 予定リスナー
   unsub=db.collection('schedule_events').onSnapshot(snap=>{
     events={};
@@ -674,6 +753,79 @@ document.getElementById('f-date-s').addEventListener('change',function(){
   const eEl=document.getElementById('f-date-e');
   if(s){eEl.min=s;if(!eEl.value||eEl.value<s)eEl.value='';}
 });
+
+// ---- 連絡事項 ----
+let noticeOpen=false, unsubNotices=null;
+
+function toggleNotice(){
+  noticeOpen=!noticeOpen;
+  document.getElementById('notice-wrap').classList.toggle('open',noticeOpen);
+  document.getElementById('notice-arrow').classList.toggle('open',noticeOpen);
+}
+
+function toggleNForm(){
+  const f=document.getElementById('n-form');
+  const show=f.style.display==='none';
+  f.style.display=show?'block':'none';
+  if(show)setTimeout(()=>document.getElementById('n-body').focus(),50);
+}
+
+async function postNotice(){
+  const tag=document.getElementById('n-tag').value;
+  const author=document.getElementById('n-author').value.trim()||'名無し';
+  const body=document.getElementById('n-body').value.trim();
+  if(!body){alert('内容を入力してください');return;}
+  try{
+    await db.collection('notices').add({tag,author,body,timestamp:Date.now()});
+    document.getElementById('n-body').value='';
+    document.getElementById('n-form').style.display='none';
+  }catch(e){alert('投稿に失敗しました: '+e.message);}
+}
+
+async function deleteNotice(id){
+  if(!confirm('この連絡事項を削除しますか？'))return;
+  try{await db.collection('notices').doc(id).delete();}
+  catch(e){alert('削除に失敗しました: '+e.message);}
+}
+
+function startNoticeListener(){
+  if(unsubNotices)unsubNotices();
+  unsubNotices=db.collection('notices').onSnapshot(snap=>{
+    const notices=[];
+    snap.forEach(doc=>notices.push({...doc.data(),id:doc.id}));
+    notices.sort((a,b)=>b.timestamp-a.timestamp);
+    renderNotices(notices);
+  },()=>{});
+}
+
+function renderNotices(notices){
+  const board=document.getElementById('notice-board');
+  board.style.display='block';
+  const list=document.getElementById('notice-list');
+  const cnt=document.getElementById('notice-cnt');
+  if(notices.length===0){
+    list.innerHTML='<div class="n-empty">連絡事項はまだありません</div>';
+    cnt.style.display='none';
+    return;
+  }
+  cnt.textContent=notices.length;
+  cnt.style.display='inline';
+  const tagMap={important:'重要',info:'連絡',done:'済み'};
+  list.innerHTML=notices.map(n=>{
+    const d=new Date(n.timestamp);
+    const ds=(d.getMonth()+1)+'/'+(d.getDate());
+    const body=(n.body||'').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+    return `<div class="n-item ${n.tag||'info'}">
+      <button class="n-del" onclick="deleteNotice('${n.id}')">×</button>
+      <div class="n-meta">
+        <span class="n-tag ${n.tag||'info'}">${tagMap[n.tag]||'連絡'}</span>
+        <span class="n-author">${n.author||''}</span>
+        <span class="n-date">${ds}</span>
+      </div>
+      <div class="n-body">${body}</div>
+    </div>`;
+  }).join('');
+}
 
 // 自動接続
 initFirebase(FIREBASE_CFG);
