@@ -124,8 +124,11 @@ td.ec.tc:hover{background:#fff3b0;}
 .n-author{font-size:11px;color:#555;font-weight:500;}
 .n-date{font-size:11px;color:#bbb;margin-left:auto;}
 .n-body{font-size:12px;color:var(--text);line-height:1.65;white-space:pre-wrap;word-break:break-all;}
-.n-del{position:absolute;top:8px;right:10px;font-size:16px;color:#ccc;cursor:pointer;background:none;border:none;line-height:1;padding:2px;}
+.n-actions{position:absolute;top:6px;right:8px;display:flex;gap:4px;align-items:center;}
+.n-del{font-size:15px;color:#ccc;cursor:pointer;background:none;border:none;line-height:1;padding:2px;}
 .n-del:hover{color:#ef4444;}
+.n-edit{font-size:13px;cursor:pointer;background:none;border:none;line-height:1;padding:2px;opacity:0.5;}
+.n-edit:hover{opacity:1;}
 .btn-add-n{width:100%;padding:8px;font-size:12px;background:#f3f0ff;color:#5b21b6;border:1.5px dashed #a78bfa;border-radius:7px;cursor:pointer;font-family:inherit;font-weight:600;transition:background .15s;}
 .btn-add-n:hover{background:#ede9fe;}
 .n-form{background:var(--surface2);border:1px solid var(--border-s);border-radius:8px;padding:11px;margin-top:9px;display:none;}
@@ -245,7 +248,7 @@ td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
         <textarea class="n-ta" id="n-body" placeholder="連絡内容を入力してください…"></textarea>
         <div class="n-form-btns">
           <button class="n-btn-cancel" onclick="toggleNForm()">キャンセル</button>
-          <button class="n-btn-post" onclick="postNotice()">投稿する</button>
+          <button class="n-btn-post" id="n-btn-post" onclick="postNotice()">投稿する</button>
         </div>
       </div>
     </div>
@@ -755,7 +758,7 @@ document.getElementById('f-date-s').addEventListener('change',function(){
 });
 
 // ---- 連絡事項 ----
-let noticeOpen=false, unsubNotices=null;
+let noticeOpen=false, unsubNotices=null, editingNoticeId=null;
 
 function toggleNotice(){
   noticeOpen=!noticeOpen;
@@ -766,8 +769,29 @@ function toggleNotice(){
 function toggleNForm(){
   const f=document.getElementById('n-form');
   const show=f.style.display==='none';
+  if(show){
+    // 新規モード
+    editingNoticeId=null;
+    document.getElementById('n-tag').value='info';
+    document.getElementById('n-author').value='';
+    document.getElementById('n-body').value='';
+    document.getElementById('n-btn-post').textContent='投稿する';
+  }
   f.style.display=show?'block':'none';
   if(show)setTimeout(()=>document.getElementById('n-body').focus(),50);
+}
+
+function openEditNotice(id,tag,author,body){
+  editingNoticeId=id;
+  document.getElementById('n-tag').value=tag||'info';
+  document.getElementById('n-author').value=author||'';
+  document.getElementById('n-body').value=body||'';
+  document.getElementById('n-btn-post').textContent='更新する';
+  const f=document.getElementById('n-form');
+  f.style.display='block';
+  setTimeout(()=>document.getElementById('n-body').focus(),50);
+  // フォームまでスクロール
+  f.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 async function postNotice(){
@@ -776,10 +800,18 @@ async function postNotice(){
   const body=document.getElementById('n-body').value.trim();
   if(!body){alert('内容を入力してください');return;}
   try{
-    await db.collection('notices').add({tag,author,body,timestamp:Date.now()});
+    if(editingNoticeId){
+      // 編集モード：既存ドキュメントを更新
+      await db.collection('notices').doc(editingNoticeId).update({tag,author,body});
+      editingNoticeId=null;
+    }else{
+      // 新規投稿
+      await db.collection('notices').add({tag,author,body,timestamp:Date.now()});
+    }
     document.getElementById('n-body').value='';
     document.getElementById('n-form').style.display='none';
-  }catch(e){alert('投稿に失敗しました: '+e.message);}
+    document.getElementById('n-btn-post').textContent='投稿する';
+  }catch(e){alert('保存に失敗しました: '+e.message);}
 }
 
 async function deleteNotice(id){
@@ -814,15 +846,19 @@ function renderNotices(notices){
   list.innerHTML=notices.map(n=>{
     const d=new Date(n.timestamp);
     const ds=(d.getMonth()+1)+'/'+(d.getDate());
-    const body=(n.body||'').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+    const bodyEsc=(n.body||'').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+    const bodyRaw=(n.body||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n');
     return `<div class="n-item ${n.tag||'info'}">
-      <button class="n-del" onclick="deleteNotice('${n.id}')">×</button>
+      <div class="n-actions">
+        <button class="n-edit" onclick="openEditNotice('${n.id}','${n.tag||'info'}','${(n.author||'').replace(/'/g,"\\'")}','${bodyRaw}')">✏️</button>
+        <button class="n-del" onclick="deleteNotice('${n.id}')">×</button>
+      </div>
       <div class="n-meta">
         <span class="n-tag ${n.tag||'info'}">${tagMap[n.tag]||'連絡'}</span>
         <span class="n-author">${n.author||''}</span>
         <span class="n-date">${ds}</span>
       </div>
-      <div class="n-body">${body}</div>
+      <div class="n-body">${bodyEsc}</div>
     </div>`;
   }).join('');
 }
