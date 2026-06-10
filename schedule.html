@@ -400,6 +400,8 @@ function initFirebase(cfg){
       firebase.initializeApp(cfg);
     }
     db=firebase.firestore();
+    // オフラインキャッシュ有効化（2回目以降の起動を高速化）
+    try{db.enablePersistence({synchronizeTabs:true}).catch(()=>{});}catch(e){}
     document.getElementById('setup-screen').style.display='none';
     document.getElementById('main-screen').style.display='block';
     document.getElementById('status-bar').style.display='block';
@@ -412,22 +414,32 @@ function initFirebase(cfg){
 
 function startListener(){
   if(unsub)unsub();
-  if(unsubPhotos)unsubPhotos();
   setStatus('読込中...','');
-  startNoticeListener();
-  // 予定リスナー
+  // 予定リスナー（先に表示してすぐ使えるようにする）
   unsub=db.collection('schedule_events').onSnapshot(snap=>{
     events={};
     snap.forEach(doc=>{events[doc.id]={...doc.data(),id:doc.id};});
     renderCalendar();
     setStatus('● リアルタイム同期中','ok');
   },err=>{setStatus('⚠ 接続エラー: '+err.message,'err');});
-  // 写真リスナー
-  unsubPhotos=db.collection('photos').onSnapshot(snap=>{
-    photos={};
-    snap.forEach(doc=>{photos[doc.id]={...doc.data(),id:doc.id};});
-    renderCalendar();
-  },()=>{});
+  // 写真は表示中の月だけ読み込む（高速化）
+  startPhotoListener();
+  // 連絡事項は予定表示後に読み込み
+  setTimeout(startNoticeListener,300);
+}
+
+function startPhotoListener(){
+  if(unsubPhotos)unsubPhotos();
+  const mStart=toDS(curYear,curMonth,1);
+  const mEnd=toDS(curYear,curMonth,getDays(curYear,curMonth));
+  unsubPhotos=db.collection('photos')
+    .where('dateKey','>=',mStart)
+    .where('dateKey','<=',mEnd)
+    .onSnapshot(snap=>{
+      photos={};
+      snap.forEach(doc=>{photos[doc.id]={...doc.data(),id:doc.id};});
+      renderCalendar();
+    },()=>{});
 }
 
 function setStatus(msg,cls){const el=document.getElementById('status-bar');el.textContent=msg;el.className=cls;}
@@ -525,7 +537,9 @@ function changeMonth(d){
   curMonth+=d;
   if(curMonth>12){curMonth=1;curYear++;}
   if(curMonth<1){curMonth=12;curYear--;}
+  photos={};
   renderCalendar();
+  startPhotoListener();
 }
 
 // ---- 写真機能 ----
