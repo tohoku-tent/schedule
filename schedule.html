@@ -203,6 +203,7 @@ td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
       <span class="hd-ttl">予　定　表</span>
       <div class="hd-nav">
         <button class="btn-nav" onclick="changeMonth(-1)">&#8249; 前月</button>
+        <button class="btn-nav" style="background:#ede9fe;border-color:#a78bfa;color:#4c1d95;font-weight:700;" onclick="goToday()">今日</button>
         <button class="btn-nav" onclick="changeMonth(1)">次月 &#8250;</button>
       </div>
     </div>
@@ -213,7 +214,8 @@ td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
     </div>
     <div class="board-footer">
       <div class="legend" id="legend"></div>
-      <div style="margin-left:auto;">
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn-nav" style="font-size:11px;" onclick="backupNow()">💾 バックアップ</button>
         <button class="btn-nav" style="font-size:11px;color:var(--hint);" onclick="resetConfig()">⚙ 設定変更</button>
       </div>
     </div>
@@ -537,6 +539,15 @@ function changeMonth(d){
   curMonth+=d;
   if(curMonth>12){curMonth=1;curYear++;}
   if(curMonth<1){curMonth=12;curYear--;}
+  photos={};
+  renderCalendar();
+  startPhotoListener();
+}
+
+function goToday(){
+  const t=new Date();
+  curYear=t.getFullYear();
+  curMonth=t.getMonth()+1;
   photos={};
   renderCalendar();
   startPhotoListener();
@@ -878,6 +889,57 @@ function renderNotices(notices){
     </div>`;
   }).join('');
 }
+
+// ---- バックアップ ----
+const BACKUP_KEY='schedule_last_backup_v1';
+
+async function downloadBackup(includePhotos){
+  const data={exportedAt:new Date().toISOString(),events:[],notices:[]};
+  const evSnap=await db.collection('schedule_events').get();
+  evSnap.forEach(d=>data.events.push({id:d.id,...d.data()}));
+  const ntSnap=await db.collection('notices').get();
+  ntSnap.forEach(d=>data.notices.push({id:d.id,...d.data()}));
+  if(includePhotos){
+    data.photos=[];
+    const phSnap=await db.collection('photos').get();
+    phSnap.forEach(d=>data.photos.push({id:d.id,...d.data()}));
+  }
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  const t=new Date();
+  a.download=`schedule-backup-${t.getFullYear()}${pad(t.getMonth()+1)}${pad(t.getDate())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+  localStorage.setItem(BACKUP_KEY,String(Date.now()));
+}
+
+function backupNow(){
+  const withPhotos=confirm('写真もバックアップに含めますか？\n（写真が多いとファイルが大きくなります）\n\nOK ＝ 写真も含む\nキャンセル ＝ 予定・連絡事項のみ');
+  downloadBackup(withPhotos)
+    .then(()=>alert('バックアップファイルをダウンロードしました。\n大切な場所に保存してください。'))
+    .catch(e=>alert('バックアップに失敗しました: '+e.message));
+}
+
+// 30日ごとの自動バックアップリマインド
+setTimeout(()=>{
+  const last=Number(localStorage.getItem(BACKUP_KEY)||0);
+  if(last===0){
+    // 初回はリマインド基準日だけ記録（いきなり全員に出さない）
+    localStorage.setItem(BACKUP_KEY,String(Date.now()));
+    return;
+  }
+  if(Date.now()-last>30*24*60*60*1000){
+    if(confirm('前回のバックアップから30日以上経過しました。\nバックアップを保存しますか？（月1回推奨）')){
+      backupNow();
+    }else{
+      // 断られたら7日後に再度
+      localStorage.setItem(BACKUP_KEY,String(Date.now()-23*24*60*60*1000));
+    }
+  }
+},3000);
 
 // 自動接続
 initFirebase(FIREBASE_CFG);
