@@ -105,7 +105,10 @@ td.ec.tc:hover{background:#fff3b0;}
 .notice-toggle:hover{background:var(--surface2);}
 .notice-toggle-left{display:flex;align-items:center;gap:8px;}
 .notice-toggle-title{font-size:14px;font-weight:700;color:var(--text);}
-.notice-cnt{background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 7px;margin-left:2px;}
+.notice-cnt{background:#bbb;color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 7px;margin-left:2px;}
+.notice-cnt.unread{background:#ef4444;animation:npulse 1.2s ease-in-out infinite;}
+@keyframes npulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.15);opacity:0.75;}}
+.n-new{background:#ef4444;color:#fff;font-size:9px;font-weight:700;border-radius:7px;padding:1px 6px;margin-left:2px;}
 .notice-arrow{font-size:13px;color:var(--hint);transition:transform .25s;}
 .notice-arrow.open{transform:rotate(180deg);}
 .notice-wrap{max-height:0;overflow:hidden;transition:max-height .35s ease;}
@@ -785,12 +788,21 @@ document.getElementById('f-date-s').addEventListener('change',function(){
 });
 
 // ---- 連絡事項 ----
-let noticeOpen=false, unsubNotices=null, editingNoticeId=null;
+let noticeOpen=false, unsubNotices=null, editingNoticeId=null, latestNoticeCount=0;
+const NOTICE_READ_KEY='notice_last_read_v1';
 
 function toggleNotice(){
   noticeOpen=!noticeOpen;
   document.getElementById('notice-wrap').classList.toggle('open',noticeOpen);
   document.getElementById('notice-arrow').classList.toggle('open',noticeOpen);
+  if(noticeOpen){
+    // 開いたら既読扱い（バッジをグレーの件数表示に戻す）
+    localStorage.setItem(NOTICE_READ_KEY,String(Date.now()));
+    const cnt=document.getElementById('notice-cnt');
+    cnt.classList.remove('unread');
+    cnt.textContent=latestNoticeCount;
+    if(latestNoticeCount===0)cnt.style.display='none';
+  }
 }
 
 function toggleNForm(){
@@ -867,12 +879,23 @@ function renderNotices(notices){
     cnt.style.display='none';
     return;
   }
-  cnt.textContent=notices.length;
+  latestNoticeCount=notices.length;
+  // 未読判定
+  const lastRead=Number(localStorage.getItem(NOTICE_READ_KEY)||0);
+  const unread=notices.filter(n=>(n.timestamp||0)>lastRead).length;
+  if(unread>0&&!noticeOpen){
+    cnt.textContent='未読'+unread;
+    cnt.classList.add('unread');
+  }else{
+    cnt.textContent=notices.length;
+    cnt.classList.remove('unread');
+  }
   cnt.style.display='inline';
   const tagMap={important:'重要',info:'連絡',done:'済み'};
   list.innerHTML=notices.map(n=>{
     const d=new Date(n.timestamp);
     const ds=(d.getMonth()+1)+'/'+(d.getDate());
+    const isNew=(n.timestamp||0)>lastRead;
     const bodyEsc=(n.body||'').replace(/</g,'&lt;').replace(/\n/g,'<br>');
     const bodyRaw=(n.body||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n');
     return `<div class="n-item ${n.tag||'info'}">
@@ -883,6 +906,7 @@ function renderNotices(notices){
       <div class="n-meta">
         <span class="n-tag ${n.tag||'info'}">${tagMap[n.tag]||'連絡'}</span>
         <span class="n-author">${n.author||''}</span>
+        ${isNew?'<span class="n-new">NEW</span>':''}
         <span class="n-date">${ds}</span>
       </div>
       <div class="n-body">${bodyEsc}</div>
