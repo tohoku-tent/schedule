@@ -155,11 +155,11 @@ td.pc.tc{background:#fffde0;}
 td.pc:hover::after{content:'📷';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px;opacity:0.25;pointer-events:none;}
 td.rh.photo-rh{background:#e8f5e9;color:#2e7d32;font-size:10px;line-height:1.4;}
 .ph-thumbs{display:flex;gap:2px;align-items:center;flex-wrap:nowrap;overflow:hidden;}
-.ph-thumb{width:44px;height:44px;object-fit:cover;border-radius:4px;border:1.5px solid #c8e6c9;cursor:pointer;transition:transform .15s,box-shadow .15s;flex-shrink:0;}
+.ph-thumb{width:40px;height:44px;object-fit:cover;border-radius:4px;border:1.5px solid #c8e6c9;cursor:pointer;transition:transform .15s,box-shadow .15s;flex-shrink:0;}
 .ph-thumb:hover{transform:scale(1.1);box-shadow:0 2px 8px rgba(0,0,0,.25);}
-.ph-more{display:inline-flex;align-items:center;justify-content:center;width:30px;height:44px;background:#b2dfdb;border-radius:4px;font-size:11px;font-weight:700;color:#004d40;cursor:pointer;flex-shrink:0;}
+.ph-more{display:inline-flex;align-items:center;justify-content:center;width:22px;height:44px;background:#b2dfdb;border-radius:4px;font-size:10px;font-weight:700;color:#004d40;cursor:pointer;flex-shrink:0;}
 .ph-more:hover{background:#80cbc4;}
-.ph-add{display:inline-flex;align-items:center;justify-content:center;width:26px;height:44px;background:transparent;border:1.5px dashed #aaa;border-radius:4px;font-size:16px;color:#aaa;cursor:pointer;flex-shrink:0;transition:all .15s;}
+.ph-add{display:inline-flex;align-items:center;justify-content:center;width:22px;height:44px;background:transparent;border:1.5px dashed #aaa;border-radius:4px;font-size:14px;color:#aaa;cursor:pointer;flex-shrink:0;transition:all .15s;}
 .ph-add:hover{border-color:#66bb6a;color:#66bb6a;background:#f1f8e9;}
 td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
 /* 写真ライトボックス */
@@ -502,15 +502,14 @@ function renderCalendar(){
     const dayPhotos=phArr.filter(p=>p.dateKey===ds);
     html+=`<td class="pc${tc}" onclick="pickPhotoForDate('${ds}')">`;
     if(dayPhotos.length>0){
+      // 96px幅に収まる構成：サムネ1枚＋残り枚数＋追加ボタン
       html+=`<div class="ph-thumbs">`;
-      const show=dayPhotos.slice(0,2);
-      show.forEach(p=>{
-        const safeUrl=p.url?p.url.replace(/'/g,"\\'"):'';
-        const safeName=(p.name||'').replace(/'/g,"\\'");
-        html+=`<img class="ph-thumb" src="${safeUrl}" onclick="event.stopPropagation();openLB('${p.id}','${ds}')" title="${safeName}">`;
-      });
-      if(dayPhotos.length>2){
-        html+=`<span class="ph-more" onclick="event.stopPropagation();openLB('${dayPhotos[2].id}','${ds}')">+${dayPhotos.length-2}</span>`;
+      const p=dayPhotos[0];
+      const safeUrl=p.url?p.url.replace(/'/g,"\\'"):'';
+      const safeName=(p.name||'').replace(/'/g,"\\'");
+      html+=`<img class="ph-thumb" src="${safeUrl}" onclick="event.stopPropagation();openLB('${p.id}','${ds}')" title="${safeName}">`;
+      if(dayPhotos.length>1){
+        html+=`<span class="ph-more" onclick="event.stopPropagation();openLB('${dayPhotos[1].id}','${ds}')">+${dayPhotos.length-1}</span>`;
       }
       html+=`<span class="ph-add" onclick="event.stopPropagation();pickPhotoForDate('${ds}')" title="写真を追加">＋</span>`;
       html+=`</div>`;
