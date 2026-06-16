@@ -165,7 +165,7 @@ td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
 /* 写真ライトボックス */
 #photo-lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:10px;}
 #photo-lb.open{display:flex;}
-#photo-lb .plb-img{max-width:92vw;max-height:76vh;border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.6);}
+#photo-lb .plb-img{max-width:92vw;max-height:76vh;border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.6);touch-action:none;transform-origin:center center;will-change:transform;}
 #photo-lb .plb-cap{color:#fff;font-size:13px;text-align:center;}
 #photo-lb .plb-close{position:fixed;top:14px;right:18px;color:#fff;font-size:32px;cursor:pointer;line-height:1;z-index:501;}
 #photo-lb .plb-del{background:#ef4444;color:#fff;border:none;border-radius:6px;padding:5px 16px;font-size:12px;cursor:pointer;font-family:inherit;}
@@ -328,7 +328,7 @@ td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
   </div>
   <div class="plb-cap" id="plb-cap"></div>
   <button class="plb-del" onclick="deleteCurrentPhoto()">🗑 この写真を削除</button>
-  <div style="color:#888;font-size:11px;margin-top:2px;">タップで閉じる　Esc で閉じる</div>
+  <div style="color:#888;font-size:11px;margin-top:2px;">ピンチ・ダブルタップで拡大　／　背景タップで閉じる</div>
 </div>
 
 <!-- 隠しファイルinput -->
@@ -609,6 +609,7 @@ function openLB(photoId,ds){
   lbPhotos=phArr;
   lbIdx=phArr.findIndex(p=>p.id===photoId);
   if(lbIdx<0)lbIdx=0;
+  if(window.lbResetZoom)window.lbResetZoom();
   showLBPhoto();
   document.getElementById('photo-lb').classList.add('open');
 }
@@ -644,10 +645,14 @@ function lbNav(dir){
   lbIdx+=dir;
   if(lbIdx<0)lbIdx=0;
   if(lbIdx>=lbPhotos.length)lbIdx=lbPhotos.length-1;
+  if(window.lbResetZoom)window.lbResetZoom();
   showLBPhoto();
 }
 
-function closeLB(){document.getElementById('photo-lb').classList.remove('open');}
+function closeLB(){
+  if(window.lbResetZoom)window.lbResetZoom();
+  document.getElementById('photo-lb').classList.remove('open');
+}
 
 async function deleteCurrentPhoto(){
   const p=lbPhotos[lbIdx];
@@ -677,25 +682,93 @@ document.addEventListener('keydown',e=>{
   }
 });
 
-// ---- タッチスワイプ対応 ----
+// ---- タッチ操作（ピンチズーム・ダブルタップ・スワイプ）----
 (function(){
-  let tx=0,ty=0,dragging=false;
   const lb=document.getElementById('photo-lb');
+  const img=document.getElementById('plb-img');
+  let scale=1,tx=0,ty=0;          // 現在の拡大率・移動量
+  let startX=0,startY=0;          // 1本指：開始位置
+  let startDist=0,startScale=1;   // 2本指：開始時の指間距離・拡大率
+  let panX=0,panY=0,moving=false; // パン用
+  let lastTap=0;                  // ダブルタップ判定
+
+  function apply(){
+    img.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;
+  }
+  function reset(){
+    scale=1;tx=0;ty=0;apply();
+    img.style.transition='transform .2s';
+    setTimeout(()=>img.style.transition='',200);
+  }
+  // 写真切替時はズームを必ずリセット
+  window.lbResetZoom=reset;
+
+  function dist(t){
+    const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY;
+    return Math.hypot(dx,dy);
+  }
+
+  img.addEventListener('touchstart',e=>{
+    if(e.touches.length===2){
+      // ピンチ開始
+      startDist=dist(e.touches);
+      startScale=scale;
+      moving=false;
+    }else if(e.touches.length===1){
+      const now=Date.now();
+      if(now-lastTap<300){
+        // ダブルタップ → ズームトグル
+        e.preventDefault();
+        if(scale>1){reset();}
+        else{scale=2.5;img.style.transition='transform .2s';apply();setTimeout(()=>img.style.transition='',200);}
+        lastTap=0;
+        return;
+      }
+      lastTap=now;
+      startX=e.touches[0].clientX;
+      startY=e.touches[0].clientY;
+      panX=tx;panY=ty;
+      moving=scale>1; // 拡大中のみパン
+    }
+  },{passive:false});
+
+  img.addEventListener('touchmove',e=>{
+    if(e.touches.length===2){
+      // ピンチズーム
+      e.preventDefault();
+      const d=dist(e.touches);
+      scale=Math.min(5,Math.max(1,startScale*(d/startDist)));
+      apply();
+    }else if(e.touches.length===1&&moving&&scale>1){
+      // 拡大中のパン
+      e.preventDefault();
+      tx=panX+(e.touches[0].clientX-startX);
+      ty=panY+(e.touches[0].clientY-startY);
+      apply();
+    }
+  },{passive:false});
+
+  // スワイプで写真切替（拡大していない時のみ）
   lb.addEventListener('touchstart',e=>{
-    tx=e.touches[0].clientX;
-    ty=e.touches[0].clientY;
-    dragging=true;
+    if(scale>1)return;
+    if(e.touches.length===1){startX=e.touches[0].clientX;startY=e.touches[0].clientY;}
   },{passive:true});
   lb.addEventListener('touchend',e=>{
-    if(!dragging)return;
-    dragging=false;
-    const dx=e.changedTouches[0].clientX-tx;
-    const dy=e.changedTouches[0].clientY-ty;
+    if(scale>1)return; // 拡大中はスワイプ切替しない
+    const dx=e.changedTouches[0].clientX-startX;
+    const dy=e.changedTouches[0].clientY-startY;
     if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>40){
-      if(dx<0)lbNav(1);   // 左スワイプ → 次
-      else     lbNav(-1);  // 右スワイプ → 前
+      if(dx<0)lbNav(1);else lbNav(-1);
     }
   },{passive:true});
+
+  // PCマウスホイールでズーム
+  img.addEventListener('wheel',e=>{
+    e.preventDefault();
+    scale=Math.min(5,Math.max(1,scale-e.deltaY*0.002));
+    if(scale===1){tx=0;ty=0;}
+    apply();
+  },{passive:false});
 })();
 
 // ---- 予定モーダル ----
