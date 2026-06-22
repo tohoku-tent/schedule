@@ -61,6 +61,7 @@ td.ec.tc{background:#fffbe6;}
 td.ec.tc:hover{background:#fff3b0;}
 .ev{display:block;font-size:10px;padding:2px 4px;border-radius:3px;margin-bottom:2px;line-height:1.35;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;transition:filter .12s;}
 .ev:hover{filter:brightness(.9);}
+.ev-spacer{visibility:hidden;cursor:default;pointer-events:none;}
 .eA{background:#ede9fe;color:#4c1d95;border-left:3px solid #7c3aed;}
 .eB{background:#d1fae5;color:#064e3b;border-left:3px solid #10b981;}
 .eC{background:#fce7f3;color:#831843;border-left:3px solid #ec4899;}
@@ -454,6 +455,14 @@ function getDow(y,m,d){return new Date(y,m-1,d).getDay();}
 function pad(n){return String(n).padStart(2,'0');}
 function toDS(y,m,d){return `${y}-${pad(m)}-${pad(d)}`;}
 function todayStr(){const t=new Date();return toDS(t.getFullYear(),t.getMonth()+1,t.getDate());}
+// イベント名の正規化（同名判定用）：括弧書き除去・空白除去・小文字化・全角英数→半角
+function normTitle(t){
+  return String(t||'')
+    .replace(/[（(].*?[）)]/g,'')        // （積込）(積込) などを除去
+    .replace(/[\s　]/g,'')               // 空白（半角・全角）除去
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)) // 全角英数→半角
+    .toLowerCase();
+}
 
 function renderCalendar(){
   const days=getDays(curYear,curMonth);
@@ -476,14 +485,49 @@ function renderCalendar(){
   html+='</tr></thead><tbody>';
 
   // 予定行
+  const mStart=toDS(curYear,curMonth,1);
+  const mEnd=toDS(curYear,curMonth,days);
   for(const row of ROWS){
+    // この担当者の当月イベントを集め、タイトルごとに固定レーン（段）を割り当てる
+    const rowEvents=evArr.filter(e=>e.person===row&&e.dateS<=mEnd&&(e.dateE||e.dateS)>=mStart);
+    // 同名（正規化）ごとに「占有する日」と最初の日を集計
+    const firstDate={},daySet={};
+    rowEvents.forEach(e=>{
+      const k=normTitle(e.title);
+      if(!firstDate[k]||e.dateS<firstDate[k])firstDate[k]=e.dateS;
+      if(!daySet[k])daySet[k]=new Set();
+      const s=new Date(e.dateS+'T00:00'),en=new Date((e.dateE||e.dateS)+'T00:00');
+      for(let dt=new Date(s);dt<=en;dt.setDate(dt.getDate()+1))daySet[k].add(dt.toISOString().slice(0,10));
+    });
+    const keys=[...new Set(rowEvents.map(e=>normTitle(e.title)))];
+    keys.sort((a,b)=>firstDate[a]<firstDate[b]?-1:firstDate[a]>firstDate[b]?1:(a<b?-1:1));
+    // 区間彩色：同名は同じ段、日が重ならない別名はレーン共有して空段を減らす
+    const laneOf={},laneDays=[];
+    keys.forEach(k=>{
+      let lane=0;
+      while(laneDays[lane]&&[...daySet[k]].some(d=>laneDays[lane].has(d)))lane++;
+      laneOf[k]=lane;
+      if(!laneDays[lane])laneDays[lane]=new Set();
+      daySet[k].forEach(d=>laneDays[lane].add(d));
+    });
+
     html+=`<tr><td class="rh">${row}</td>`;
     for(let d=1;d<=days;d++){
       const ds=toDS(curYear,curMonth,d);
       const tc=ds===today?' tc':'';
       const matched=evArr.filter(e=>e.person===row&&e.dateS<=ds&&(e.dateE||e.dateS)>=ds);
       html+=`<td class="ec${tc}" onclick="openModalCell('${row}','${ds}')">`;
-      for(const ev of matched){
+      // レーンごとにスロットへ配置（同名は同じ段になる）
+      const slots=[];
+      matched.forEach(ev=>{const ln=laneOf[normTitle(ev.title)];if(slots[ln])slots.push(ev);else slots[ln]=ev;});
+      let lastLane=-1;
+      slots.forEach((ev,i)=>{if(ev)lastLane=i;});
+      for(let i=0;i<=lastLane;i++){
+        const ev=slots[i];
+        if(!ev){
+          html+=`<span class="ev ev-spacer">&nbsp;</span>`;
+          continue;
+        }
         const cls=RCLASS[row]||'eF';
         const comp=ev.companions&&ev.companions.length?'同行: '+ev.companions.join('・'):'';
         const tipTxt=[ev.title,ev.memo,comp].filter(Boolean).join('\n');
