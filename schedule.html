@@ -522,6 +522,10 @@ function renderCalendar(){
       matched.forEach(ev=>{const ln=laneOf[normTitle(ev.title)];if(slots[ln])slots.push(ev);else slots[ln]=ev;});
       let lastLane=-1;
       slots.forEach((ev,i)=>{if(ev)lastLane=i;});
+      // 10月・11月の穐元/真壁は最低5段確保（行を増やす）
+      if((curMonth===10||curMonth===11)&&(row==='穐元'||row==='真壁')){
+        if(lastLane<4)lastLane=4;
+      }
       for(let i=0;i<=lastLane;i++){
         const ev=slots[i];
         if(!ev){
