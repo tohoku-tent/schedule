@@ -520,7 +520,7 @@ function normTitle(t){
     .replace(/[\s　]/g,'')               // 空白（半角・全角）除去
     .replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)) // 全角英数→半角
     .toLowerCase();
-  const stripped=base.replace(/(設営|撤去|積込み?|積み込み|搬入|搬出|回収|片付け?|現調|本番)+$/,'');
+  const stripped=base.replace(/([・、,，\/／\-－~〜]*(設営|撤去|積込み?|積み込み|搬入|搬出|回収|片付け?|現調|本番)[・、,，\/／\-－~〜]*)+$/,'');
   return stripped||base; // 「回収」だけ等、全部消えたら元のまま
 }
 
