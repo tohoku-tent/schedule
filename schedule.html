@@ -671,6 +671,31 @@ function updateLegend(){
   }).join('')+`<div class="li"><div class="ld" style="background:#e8f5e9;border:1.5px solid #22c55e"></div>📷写真</div>`;
 }
 
+// 月間カレンダー用レーン計算：担当者順（吉成→穐元→…）→開始日順に処理し、
+// 全日程で空いている一番上の段へ配置。同名イベント（正規化）は同じ段＝隣り合わせになる
+function computeMonthLanes(evts){
+  const groups={}; // person|正規化名 -> {person, days, first}
+  evts.forEach(e=>{
+    const key=e.person+'|'+normTitle(e.title);
+    if(!groups[key])groups[key]={person:e.person,days:new Set(),first:e.dateS,key:key};
+    const g=groups[key];
+    if(e.dateS<g.first)g.first=e.dateS;
+    const s=new Date(e.dateS+'T00:00'),en=new Date((e.dateE||e.dateS)+'T00:00');
+    for(let dt=new Date(s);dt<=en;dt.setDate(dt.getDate()+1))g.days.add(dt.toISOString().slice(0,10));
+  });
+  const arr=Object.values(groups);
+  arr.sort((a,b)=>(ROWS.indexOf(a.person)-ROWS.indexOf(b.person))||(a.first<b.first?-1:a.first>b.first?1:(a.key<b.key?-1:1)));
+  const laneDays=[],laneOf={};
+  arr.forEach(g=>{
+    let lane=0;
+    while(laneDays[lane]&&[...g.days].some(d=>laneDays[lane].has(d)))lane++;
+    laneOf[g.key]=lane;
+    if(!laneDays[lane])laneDays[lane]=new Set();
+    g.days.forEach(d=>laneDays[lane].add(d));
+  });
+  return laneOf;
+}
+
 // ---- 月間カレンダー（週ごとの格子）描画 ----
 function renderMonthGrid(){
   const days=getDays(curYear,curMonth);
@@ -678,11 +703,11 @@ function renderMonthGrid(){
   const evArr=Object.values(events);
   const phArr=Object.values(photos);
   const startDow=(getDow(curYear,curMonth,1)+6)%7; // 月曜始まり
-  // 月全体でレーン（段）を計算：同じイベントはどの日でも同じ段に表示される
+  // 月全体でレーン（段）を計算：担当者順＋同じイベントはどの日でも同じ段に表示される
   const mStart=toDS(curYear,curMonth,1);
   const mEnd=toDS(curYear,curMonth,days);
   const monthEvents=evArr.filter(e=>e.dateS<=mEnd&&(e.dateE||e.dateS)>=mStart);
-  const laneOf=computeLanes(monthEvents);
+  const laneOf=computeMonthLanes(monthEvents);
   let html='<thead><tr>';
   ['月','火','水','木','金','土','日'].forEach((w,i)=>{html+=`<th class="${i===6?'su':i===5?'sa':''}">${w}</th>`;});
   html+='</tr></thead><tbody>';
@@ -698,7 +723,7 @@ function renderMonthGrid(){
       // 段（レーン）にスロット配置：同じイベントは毎日同じ段、空段はスペーサーで維持
       const dayEvsAll=evArr.filter(e=>e.dateS<=ds&&(e.dateE||e.dateS)>=ds);
       const slots=[];
-      dayEvsAll.forEach(ev=>{const ln=laneOf[normTitle(ev.title)];if(slots[ln])slots.push(ev);else slots[ln]=ev;});
+      dayEvsAll.forEach(ev=>{const ln=laneOf[ev.person+'|'+normTitle(ev.title)];if(slots[ln])slots.push(ev);else slots[ln]=ev;});
       let lastLane=-1;
       slots.forEach((ev,i)=>{if(ev)lastLane=i;});
       const dayPhotos=phArr.filter(p=>p.dateKey===ds);
@@ -726,9 +751,9 @@ function mgOpenDay(ds){
   document.getElementById('mg-day-title').textContent=`${m}月${dd}日（${DJP[getDow(y,m,dd)]}）の予定`;
   let html='';
   const mS=toDS(curYear,curMonth,1),mE=toDS(curYear,curMonth,getDays(curYear,curMonth));
-  const laneOf=computeLanes(evArr.filter(e=>e.dateS<=mE&&(e.dateE||e.dateS)>=mS));
+  const laneOf=computeMonthLanes(evArr.filter(e=>e.dateS<=mE&&(e.dateE||e.dateS)>=mS));
   const evs=evArr.filter(e=>e.dateS<=ds&&(e.dateE||e.dateS)>=ds);
-  evs.sort((a,b)=>(laneOf[normTitle(a.title)]||0)-(laneOf[normTitle(b.title)]||0));
+  evs.sort((a,b)=>(laneOf[a.person+'|'+normTitle(a.title)]||0)-(laneOf[b.person+'|'+normTitle(b.title)]||0));
   evs.forEach(ev=>{
     const cls=RCLASS[ev.person]||'eF';
     html+=`<div class="mgd-item ${cls}" onclick="document.getElementById('mg-day-modal').classList.remove('open');editEvent('${ev.id}')"><b>${ev.person}</b>：${ev.title}${ev.memo?'　'+ev.memo:''}</div>`;
