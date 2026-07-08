@@ -54,7 +54,7 @@ th.dh{text-align:center;padding:2px 1px;width:72px;min-width:72px;max-width:72px
 .dw.sa{color:var(--blue);background:#e6f0fb;border-radius:2px;}
 td.rh{position:sticky;left:0;z-index:2;width:42px;min-width:42px;background:var(--surface2);font-size:11px;font-weight:700;text-align:center;vertical-align:middle;padding:2px 3px;color:#222;white-space:nowrap;box-shadow:2px 0 4px rgba(0,0,0,0.07);}
 th.rh-top{position:sticky;left:0;z-index:3;width:42px;min-width:42px;background:var(--surface2);box-shadow:2px 0 4px rgba(0,0,0,0.07);}
-td.ec{height:68px;padding:2px;vertical-align:top;cursor:pointer;transition:background .12s;position:relative;width:72px;min-width:72px;max-width:72px;overflow:hidden;}
+td.ec{height:44px;padding:2px;vertical-align:top;cursor:pointer;transition:background .12s;position:relative;width:72px;min-width:72px;max-width:72px;overflow:hidden;}
 td.ec:hover{background:#f0f0ff;}
 td.ec:hover::after{content:'+';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:18px;color:#a78bfa;opacity:0.4;pointer-events:none;}
 td.ec.tc{background:#fffbe6;}
@@ -98,7 +98,7 @@ td.ec.tc:hover{background:#fff3b0;}
 .tooltip{display:none;position:fixed;background:var(--text);color:#fff;font-size:11px;padding:5px 9px;border-radius:6px;pointer-events:none;z-index:200;max-width:200px;line-height:1.5;white-space:pre-wrap;}
 #loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,0.7);z-index:300;align-items:center;justify-content:center;font-size:14px;color:var(--mute);}
 #loading.show{display:flex;}
-@media(max-width:600px){body{padding:6px;}.hd-ttl{display:none;}.hd-mo{font-size:18px;}.hd-yr{font-size:13px;}.bh{padding:6px 10px;}td.ec{height:54px;}td.pc{height:44px;}.board-footer{padding:5px 10px;}}
+@media(max-width:600px){body{padding:6px;}.hd-ttl{display:none;}.hd-mo{font-size:18px;}.hd-yr{font-size:13px;}.bh{padding:6px 10px;}td.ec{height:44px;}td.pc{height:44px;}.board-footer{padding:5px 10px;}}
 
 /* ===== 表示切替タブ・月間カレンダー ===== */
 .view-tabs{display:flex;gap:6px;padding:8px 12px 0;background:var(--surface2);}
@@ -406,6 +406,8 @@ const HOLIDAYS={
   '2027-11-23':'勤労感謝の日',
 };
 const ROWS=['吉成','穐元','真壁','敏美','縫製','その他','休み'];
+// 各行の最低段数（予定がこれを超えた日は自動で伸びる）
+const MIN_LANES={吉成:5,穐元:5,真壁:5,敏美:2,縫製:2,その他:2,休み:2};
 const RCLASS={穐元:'eA',真壁:'eB',敏美:'eC',吉成:'eD',縫製:'eE',その他:'eF',休み:'eH'};
 const RCOLORS={
   穐元:{bg:'#ede9fe',bd:'#7c3aed'},真壁:{bg:'#d1fae5',bd:'#10b981'},
@@ -583,10 +585,9 @@ function renderCalendar(){
       matched.forEach(ev=>{const ln=laneOf[normTitle(ev.title)];if(slots[ln])slots.push(ev);else slots[ln]=ev;});
       let lastLane=-1;
       slots.forEach((ev,i)=>{if(ev)lastLane=i;});
-      // 10月・11月の穐元/真壁は最低5段確保（行を増やす）
-      if((curMonth===10||curMonth===11)&&(row==='穐元'||row==='真壁')){
-        if(lastLane<4)lastLane=4;
-      }
+      // 行ごとの最低段数を確保（吉成・穐元・真壁=5段、敏美・縫製・その他・休み=2段）
+      const minLast=(MIN_LANES[row]||1)-1;
+      if(lastLane<minLast)lastLane=minLast;
       for(let i=0;i<=lastLane;i++){
         const ev=slots[i];
         if(!ev){
