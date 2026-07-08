@@ -117,7 +117,10 @@ table.mg td.tc{background:#fffbe6;}
 .mev{display:block;font-size:9px;padding:1px 3px;border-radius:3px;margin-bottom:1px;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 .mg-more{font-size:9px;color:#7c3aed;padding:0 3px;font-weight:700;}
 .mgd-item{font-size:12px;padding:7px 9px;border-radius:6px;margin-bottom:6px;cursor:pointer;line-height:1.5;}
-@media(max-width:600px){table.mg td{height:64px;}}
+@media(max-width:600px){
+  table.mg td{height:88px;}
+  .mev{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.25;}
+}
 
 /* ===== 連絡事項 ===== */
 .notice-board{background:var(--surface);border-radius:var(--r);border:1px solid var(--border-s);box-shadow:0 2px 16px rgba(0,0,0,0.08);overflow:hidden;margin-top:12px;}
@@ -650,9 +653,9 @@ function renderMonthGrid(){
   const today=todayStr();
   const evArr=Object.values(events);
   const phArr=Object.values(photos);
-  const startDow=getDow(curYear,curMonth,1);
+  const startDow=(getDow(curYear,curMonth,1)+6)%7; // 月曜始まり
   let html='<thead><tr>';
-  DJP.forEach((w,i)=>{html+=`<th class="${i===0?'su':i===6?'sa':''}">${w}</th>`;});
+  ['月','火','水','木','金','土','日'].forEach((w,i)=>{html+=`<th class="${i===6?'su':i===5?'sa':''}">${w}</th>`;});
   html+='</tr></thead><tbody>';
   let d=1-startDow;
   while(d<=days){
@@ -662,7 +665,7 @@ function renderMonthGrid(){
       const ds=toDS(curYear,curMonth,d);
       const tc=ds===today?' tc':'';
       const hol=!!HOLIDAYS[ds];
-      const dc=(i===0||hol)?'su':i===6?'sa':'';
+      const dc=(i===6||hol)?'su':i===5?'sa':'';
       const dayEvs=[];
       ROWS.forEach(row=>{
         evArr.filter(e=>e.person===row&&e.dateS<=ds&&(e.dateE||e.dateS)>=ds).forEach(e=>dayEvs.push(e));
