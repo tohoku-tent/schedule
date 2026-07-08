@@ -116,6 +116,7 @@ table.mg td.tc{background:#fffbe6;}
 .mg-dn.sa{color:var(--blue);}
 .mev{display:block;font-size:9px;padding:1px 3px;border-radius:3px;margin-bottom:1px;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
 .mg-more{font-size:9px;color:#7c3aed;padding:0 3px;font-weight:700;}
+.mev.mev-sp{visibility:hidden;}
 .mgd-item{font-size:12px;padding:7px 9px;border-radius:6px;margin-bottom:6px;cursor:pointer;line-height:1.5;}
 @media(max-width:600px){
   table.mg td{height:88px;}
@@ -663,13 +664,11 @@ function renderMonthGrid(){
   const evArr=Object.values(events);
   const phArr=Object.values(photos);
   const startDow=(getDow(curYear,curMonth,1)+6)%7; // 月曜始まり
-  // 担当者ごとにレーン（表示順）を当月分まとめて計算：同名イベントは毎日同じ順番に並ぶ
+  // 月全体でレーン（段）を計算：同じイベントはどの日でも同じ段に表示される
   const mStart=toDS(curYear,curMonth,1);
   const mEnd=toDS(curYear,curMonth,days);
-  const lanesByRow={};
-  ROWS.forEach(row=>{
-    lanesByRow[row]=computeLanes(evArr.filter(e=>e.person===row&&e.dateS<=mEnd&&(e.dateE||e.dateS)>=mStart));
-  });
+  const monthEvents=evArr.filter(e=>e.dateS<=mEnd&&(e.dateE||e.dateS)>=mStart);
+  const laneOf=computeLanes(monthEvents);
   let html='<thead><tr>';
   ['月','火','水','木','金','土','日'].forEach((w,i)=>{html+=`<th class="${i===6?'su':i===5?'sa':''}">${w}</th>`;});
   html+='</tr></thead><tbody>';
@@ -682,20 +681,21 @@ function renderMonthGrid(){
       const tc=ds===today?' tc':'';
       const hol=!!HOLIDAYS[ds];
       const dc=(i===6||hol)?'su':i===5?'sa':'';
-      const dayEvs=[];
-      ROWS.forEach(row=>{
-        const evs=evArr.filter(e=>e.person===row&&e.dateS<=ds&&(e.dateE||e.dateS)>=ds);
-        evs.sort((a,b)=>(lanesByRow[row][normTitle(a.title)]||0)-(lanesByRow[row][normTitle(b.title)]||0));
-        evs.forEach(e=>dayEvs.push(e));
-      });
+      // 段（レーン）にスロット配置：同じイベントは毎日同じ段、空段はスペーサーで維持
+      const dayEvsAll=evArr.filter(e=>e.dateS<=ds&&(e.dateE||e.dateS)>=ds);
+      const slots=[];
+      dayEvsAll.forEach(ev=>{const ln=laneOf[normTitle(ev.title)];if(slots[ln])slots.push(ev);else slots[ln]=ev;});
+      let lastLane=-1;
+      slots.forEach((ev,i)=>{if(ev)lastLane=i;});
       const dayPhotos=phArr.filter(p=>p.dateKey===ds);
       html+=`<td class="${tc}" onclick="mgOpenDay('${ds}')">`;
       html+=`<span class="mg-dn ${dc}">${d}${dayPhotos.length?' 📷':''}</span>`;
-      dayEvs.slice(0,3).forEach(e=>{
-        const cls=RCLASS[e.person]||'eF';
-        html+=`<span class="mev ${cls}">${e.title}</span>`;
-      });
-      if(dayEvs.length>3)html+=`<span class="mg-more">＋${dayEvs.length-3}件</span>`;
+      for(let s=0;s<=lastLane;s++){
+        const ev=slots[s];
+        if(!ev){html+=`<span class="mev mev-sp">&nbsp;</span>`;continue;}
+        const cls=RCLASS[ev.person]||'eF';
+        html+=`<span class="mev ${cls}">${ev.title}</span>`;
+      }
       html+='</td>';
     }
     html+='</tr>';
@@ -712,14 +712,12 @@ function mgOpenDay(ds){
   document.getElementById('mg-day-title').textContent=`${m}月${dd}日（${DJP[getDow(y,m,dd)]}）の予定`;
   let html='';
   const mS=toDS(curYear,curMonth,1),mE=toDS(curYear,curMonth,getDays(curYear,curMonth));
-  ROWS.forEach(row=>{
-    const laneOf=computeLanes(evArr.filter(e=>e.person===row&&e.dateS<=mE&&(e.dateE||e.dateS)>=mS));
-    const evs=evArr.filter(e=>e.person===row&&e.dateS<=ds&&(e.dateE||e.dateS)>=ds);
-    evs.sort((a,b)=>(laneOf[normTitle(a.title)]||0)-(laneOf[normTitle(b.title)]||0));
-    evs.forEach(ev=>{
-      const cls=RCLASS[row]||'eF';
-      html+=`<div class="mgd-item ${cls}" onclick="document.getElementById('mg-day-modal').classList.remove('open');editEvent('${ev.id}')"><b>${row}</b>：${ev.title}${ev.memo?'　'+ev.memo:''}</div>`;
-    });
+  const laneOf=computeLanes(evArr.filter(e=>e.dateS<=mE&&(e.dateE||e.dateS)>=mS));
+  const evs=evArr.filter(e=>e.dateS<=ds&&(e.dateE||e.dateS)>=ds);
+  evs.sort((a,b)=>(laneOf[normTitle(a.title)]||0)-(laneOf[normTitle(b.title)]||0));
+  evs.forEach(ev=>{
+    const cls=RCLASS[ev.person]||'eF';
+    html+=`<div class="mgd-item ${cls}" onclick="document.getElementById('mg-day-modal').classList.remove('open');editEvent('${ev.id}')"><b>${ev.person}</b>：${ev.title}${ev.memo?'　'+ev.memo:''}</div>`;
   });
   if(phArr.length){
     html+=`<div class="mgd-item" style="background:#e8f5e9;border-left:3px solid #22c55e;" onclick="document.getElementById('mg-day-modal').classList.remove('open');openLB('${phArr[0].id}','${ds}')">📷 写真 ${phArr.length}枚を見る</div>`;
