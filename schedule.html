@@ -526,6 +526,30 @@ function normTitle(t){
   return stripped||base; // 「回収」だけ等、全部消えたら元のまま
 }
 
+// タイトルごとの固定レーン（段）割り当て：同名（正規化）は同じ段、
+// 日が重ならない別名はレーン共有して空段を減らす（区間彩色）
+function computeLanes(rowEvents){
+  const firstDate={},daySet={};
+  rowEvents.forEach(e=>{
+    const k=normTitle(e.title);
+    if(!firstDate[k]||e.dateS<firstDate[k])firstDate[k]=e.dateS;
+    if(!daySet[k])daySet[k]=new Set();
+    const s=new Date(e.dateS+'T00:00'),en=new Date((e.dateE||e.dateS)+'T00:00');
+    for(let dt=new Date(s);dt<=en;dt.setDate(dt.getDate()+1))daySet[k].add(dt.toISOString().slice(0,10));
+  });
+  const keys=[...new Set(rowEvents.map(e=>normTitle(e.title)))];
+  keys.sort((a,b)=>firstDate[a]<firstDate[b]?-1:firstDate[a]>firstDate[b]?1:(a<b?-1:1));
+  const laneOf={},laneDays=[];
+  keys.forEach(k=>{
+    let lane=0;
+    while(laneDays[lane]&&[...daySet[k]].some(d=>laneDays[lane].has(d)))lane++;
+    laneOf[k]=lane;
+    if(!laneDays[lane])laneDays[lane]=new Set();
+    daySet[k].forEach(d=>laneDays[lane].add(d));
+  });
+  return laneOf;
+}
+
 function renderCalendar(){
   const days=getDays(curYear,curMonth);
   document.getElementById('disp-year').textContent=curYear;
@@ -553,26 +577,7 @@ function renderCalendar(){
   for(const row of ROWS){
     // この担当者の当月イベントを集め、タイトルごとに固定レーン（段）を割り当てる
     const rowEvents=evArr.filter(e=>e.person===row&&e.dateS<=mEnd&&(e.dateE||e.dateS)>=mStart);
-    // 同名（正規化）ごとに「占有する日」と最初の日を集計
-    const firstDate={},daySet={};
-    rowEvents.forEach(e=>{
-      const k=normTitle(e.title);
-      if(!firstDate[k]||e.dateS<firstDate[k])firstDate[k]=e.dateS;
-      if(!daySet[k])daySet[k]=new Set();
-      const s=new Date(e.dateS+'T00:00'),en=new Date((e.dateE||e.dateS)+'T00:00');
-      for(let dt=new Date(s);dt<=en;dt.setDate(dt.getDate()+1))daySet[k].add(dt.toISOString().slice(0,10));
-    });
-    const keys=[...new Set(rowEvents.map(e=>normTitle(e.title)))];
-    keys.sort((a,b)=>firstDate[a]<firstDate[b]?-1:firstDate[a]>firstDate[b]?1:(a<b?-1:1));
-    // 区間彩色：同名は同じ段、日が重ならない別名はレーン共有して空段を減らす
-    const laneOf={},laneDays=[];
-    keys.forEach(k=>{
-      let lane=0;
-      while(laneDays[lane]&&[...daySet[k]].some(d=>laneDays[lane].has(d)))lane++;
-      laneOf[k]=lane;
-      if(!laneDays[lane])laneDays[lane]=new Set();
-      daySet[k].forEach(d=>laneDays[lane].add(d));
-    });
+    const laneOf=computeLanes(rowEvents);
 
     html+=`<tr><td class="rh">${row}</td>`;
     for(let d=1;d<=days;d++){
@@ -658,6 +663,13 @@ function renderMonthGrid(){
   const evArr=Object.values(events);
   const phArr=Object.values(photos);
   const startDow=(getDow(curYear,curMonth,1)+6)%7; // 月曜始まり
+  // 担当者ごとにレーン（表示順）を当月分まとめて計算：同名イベントは毎日同じ順番に並ぶ
+  const mStart=toDS(curYear,curMonth,1);
+  const mEnd=toDS(curYear,curMonth,days);
+  const lanesByRow={};
+  ROWS.forEach(row=>{
+    lanesByRow[row]=computeLanes(evArr.filter(e=>e.person===row&&e.dateS<=mEnd&&(e.dateE||e.dateS)>=mStart));
+  });
   let html='<thead><tr>';
   ['月','火','水','木','金','土','日'].forEach((w,i)=>{html+=`<th class="${i===6?'su':i===5?'sa':''}">${w}</th>`;});
   html+='</tr></thead><tbody>';
@@ -672,7 +684,9 @@ function renderMonthGrid(){
       const dc=(i===6||hol)?'su':i===5?'sa':'';
       const dayEvs=[];
       ROWS.forEach(row=>{
-        evArr.filter(e=>e.person===row&&e.dateS<=ds&&(e.dateE||e.dateS)>=ds).forEach(e=>dayEvs.push(e));
+        const evs=evArr.filter(e=>e.person===row&&e.dateS<=ds&&(e.dateE||e.dateS)>=ds);
+        evs.sort((a,b)=>(lanesByRow[row][normTitle(a.title)]||0)-(lanesByRow[row][normTitle(b.title)]||0));
+        evs.forEach(e=>dayEvs.push(e));
       });
       const dayPhotos=phArr.filter(p=>p.dateKey===ds);
       html+=`<td class="${tc}" onclick="mgOpenDay('${ds}')">`;
@@ -697,8 +711,12 @@ function mgOpenDay(ds){
   const [y,m,dd]=ds.split('-').map(Number);
   document.getElementById('mg-day-title').textContent=`${m}月${dd}日（${DJP[getDow(y,m,dd)]}）の予定`;
   let html='';
+  const mS=toDS(curYear,curMonth,1),mE=toDS(curYear,curMonth,getDays(curYear,curMonth));
   ROWS.forEach(row=>{
-    evArr.filter(e=>e.person===row&&e.dateS<=ds&&(e.dateE||e.dateS)>=ds).forEach(ev=>{
+    const laneOf=computeLanes(evArr.filter(e=>e.person===row&&e.dateS<=mE&&(e.dateE||e.dateS)>=mS));
+    const evs=evArr.filter(e=>e.person===row&&e.dateS<=ds&&(e.dateE||e.dateS)>=ds);
+    evs.sort((a,b)=>(laneOf[normTitle(a.title)]||0)-(laneOf[normTitle(b.title)]||0));
+    evs.forEach(ev=>{
       const cls=RCLASS[row]||'eF';
       html+=`<div class="mgd-item ${cls}" onclick="document.getElementById('mg-day-modal').classList.remove('open');editEvent('${ev.id}')"><b>${row}</b>：${ev.title}${ev.memo?'　'+ev.memo:''}</div>`;
     });
