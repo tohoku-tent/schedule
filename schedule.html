@@ -6,8 +6,19 @@
 <link rel="manifest" href="/schedule/manifest.json">
 <meta name="theme-color" content="#ffffff">
 <script>
+  // 新バージョンを検知したら自動でページを更新（手動キャッシュ削除を不要にする）
   if ('serviceWorker' in navigator) {
- navigator.serviceWorker.register('/schedule/sw.js');
+    let _refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (_refreshing) return;
+      _refreshing = true;
+      window.location.reload();
+    });
+    navigator.serviceWorker.register('/schedule/sw.js').then(function(reg) {
+      // 起動のたびに更新チェック
+      reg.update();
+      setInterval(function(){ reg.update(); }, 60 * 60 * 1000);
+    });
   }
 </script>
   <title>社内スケジュール予定表</title>
