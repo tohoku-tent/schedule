@@ -513,12 +513,15 @@ function pad(n){return String(n).padStart(2,'0');}
 function toDS(y,m,d){return `${y}-${pad(m)}-${pad(d)}`;}
 function todayStr(){const t=new Date();return toDS(t.getFullYear(),t.getMonth()+1,t.getDate());}
 // イベント名の正規化（同名判定用）：括弧書き除去・空白除去・小文字化・全角英数→半角
+// さらに末尾の作業名（設営・撤去・積込など）も除去して「林業祭設営」「林業祭撤去」を同一視する
 function normTitle(t){
-  return String(t||'')
+  const base=String(t||'')
     .replace(/[（(].*?[）)]/g,'')        // （積込）(積込) などを除去
     .replace(/[\s　]/g,'')               // 空白（半角・全角）除去
     .replace(/[Ａ-Ｚａ-ｚ０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)) // 全角英数→半角
     .toLowerCase();
+  const stripped=base.replace(/(設営|撤去|積込み?|積み込み|搬入|搬出|回収|片付け?|現調|本番)+$/,'');
+  return stripped||base; // 「回収」だけ等、全部消えたら元のまま
 }
 
 function renderCalendar(){
