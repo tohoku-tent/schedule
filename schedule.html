@@ -687,13 +687,15 @@ function computeMonthLanes(evts){
   });
   const arr=Object.values(groups);
   arr.sort((a,b)=>(ROWS.indexOf(a.person)-ROWS.indexOf(b.person))||(a.first<b.first?-1:a.first>b.first?1:(a.key<b.key?-1:1)));
-  const laneDays=[],laneOf={};
+  // 担当者順（＝arrの並び順）を保ったまま段を割り当てる。
+  // 各グループは、その日程内で既に置かれた予定（＝上位担当者・より早い予定）より必ず下の段に入れる。
+  // これで月間カレンダーでも担当別と同じ縦の並び順（例：その他は下段）が崩れない。
+  const laneOf={},dayMaxLane={};
   arr.forEach(g=>{
     let lane=0;
-    while(laneDays[lane]&&[...g.days].some(d=>laneDays[lane].has(d)))lane++;
+    g.days.forEach(d=>{ if(dayMaxLane[d]!==undefined && dayMaxLane[d]+1>lane) lane=dayMaxLane[d]+1; });
     laneOf[g.key]=lane;
-    if(!laneDays[lane])laneDays[lane]=new Set();
-    g.days.forEach(d=>laneDays[lane].add(d));
+    g.days.forEach(d=>{ dayMaxLane[d]=lane; });
   });
   return laneOf;
 }
