@@ -512,6 +512,14 @@ function applyViewTabs(){
   document.getElementById('cal-wrap-row').style.display=viewMode==='row'?'':'none';
   document.getElementById('mg-wrap').style.display=viewMode==='month'?'':'none';
   document.getElementById('bill-wrap').style.display=viewMode==='bill'?'':'none';
+  applyNoticeVisibility();
+}
+// 連絡事項は請求チェックのタブでは表示しない
+function applyNoticeVisibility(){
+  const board=document.getElementById('notice-board');
+  if(!board)return;
+  if(viewMode==='bill')board.style.display='none';
+  else if(board.dataset.ready==='1')board.style.display='block';
 }
 applyViewTabs();
 
@@ -1374,7 +1382,8 @@ function startNoticeListener(){
 
 function renderNotices(notices){
   const board=document.getElementById('notice-board');
-  board.style.display='block';
+  board.dataset.ready='1';
+  applyNoticeVisibility();
   const list=document.getElementById('notice-list');
   const cnt=document.getElementById('notice-cnt');
   if(notices.length===0){
