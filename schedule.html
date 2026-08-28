@@ -53,6 +53,42 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
 .hd-nav{margin-left:auto;display:flex;gap:6px;}
 .btn-nav,.btn-add{font-size:12px;padding:4px 12px;cursor:pointer;background:var(--surface);border:1px solid var(--border-s);border-radius:6px;color:var(--text);font-family:inherit;transition:background .15s;white-space:nowrap;}
 .btn-nav:hover,.btn-add:hover{background:#eee;}
+/* ===== 請求チェック ===== */
+#bill-wrap{padding:12px 14px 4px;}
+.bill-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px;}
+.bill-tiles{display:flex;flex-wrap:wrap;gap:8px;}
+.bt{border:1px solid var(--border-s);border-radius:9px;padding:6px 14px;background:var(--surface2);min-width:96px;}
+.bt .l{font-size:10.5px;color:var(--mute);font-weight:500;}
+.bt .n{font-size:20px;font-weight:700;line-height:1.25;}
+.bt .n span{font-size:11px;font-weight:500;color:var(--mute);margin-left:2px;}
+.bt.warn{background:#fdecea;border-color:#f0b4ad;}
+.bt.warn .n{color:#c0392b;}
+.bt.done .n{color:#059669;}
+.bill-tools{margin-left:auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.bill-chk{font-size:11.5px;color:var(--mute);display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;}
+.bill-chk input{cursor:pointer;}
+.bgrp{margin-bottom:14px;}
+.bgrp-h{font-size:12px;font-weight:700;padding:4px 2px;border-bottom:1.5px solid var(--border-s);margin-bottom:6px;display:flex;align-items:center;gap:7px;}
+.bgrp-h .pc{width:9px;height:9px;border-radius:50%;flex:none;}
+.bgrp-h .cnt{margin-left:auto;font-size:11px;font-weight:500;color:var(--mute);}
+.bitem{display:flex;align-items:center;gap:9px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;background:var(--surface);font-size:12.5px;flex-wrap:wrap;}
+.bitem .sdot{width:10px;height:10px;border-radius:50%;flex:none;background:#c9c4bb;}
+.bitem .nm{font-weight:500;}
+.bitem .dt{font-size:11px;color:var(--hint);}
+.bitem .cnt2{font-size:10.5px;color:var(--mute);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:0 5px;}
+.bitem .acts{margin-left:auto;display:flex;gap:4px;}
+.bbtn{font-size:10.5px;font-family:inherit;padding:3px 9px;border-radius:5px;cursor:pointer;background:var(--surface);border:1px solid var(--border-s);color:var(--mute);white-space:nowrap;}
+.bbtn:hover{background:#eee;}
+.bbtn.on-billed{background:#d1fae5;border-color:#6ee7b7;color:#046c4e;font-weight:700;}
+.bbtn.on-exempt{background:#e8e6e1;border-color:#c9c4bb;color:#5d574e;font-weight:700;}
+.bitem.st-unbilled{background:#fdecea;border-color:#f0b4ad;}
+.bitem.st-unbilled .sdot{background:#d94040;}
+.bitem.st-billed{background:#eafaf1;border-color:#a7ddc2;}
+.bitem.st-billed .sdot{background:#059669;}
+.bitem.st-exempt{opacity:.55;}
+.bitem.st-exempt .nm{text-decoration:line-through;text-decoration-color:var(--hint);}
+.bill-empty{padding:26px 14px;text-align:center;color:var(--mute);font-size:13px;}
+.bill-note{font-size:11px;color:var(--hint);padding:2px 2px 12px;line-height:1.7;}
 .cal-scroll{overflow-x:auto;}
 table.cal{border-collapse:collapse;table-layout:fixed;}
 table.cal th,table.cal td{border:0.5px solid var(--border);vertical-align:top;padding:0;}
@@ -253,6 +289,7 @@ td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
     <div class="view-tabs">
       <button class="vtab active" id="vtab-row" onclick="setView('row')">担当別</button>
       <button class="vtab" id="vtab-month" onclick="setView('month')">月間カレンダー</button>
+      <button class="vtab" id="vtab-bill" onclick="setView('bill')">請求チェック</button>
     </div>
     <div class="cal-scroll" id="cal-wrap-row">
       <table class="cal" id="cal-table">
@@ -261,6 +298,16 @@ td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
     </div>
     <div id="mg-wrap" style="display:none;">
       <table class="mg" id="mg-table"></table>
+    </div>
+    <div id="bill-wrap" style="display:none;">
+      <div class="bill-head">
+        <div class="bill-tiles" id="bill-tiles"></div>
+        <div class="bill-tools">
+          <label class="bill-chk"><input type="checkbox" id="bill-hide-done" onchange="renderBilling()"> 請求済み・対象外を隠す</label>
+          <button class="btn-nav" style="font-size:11px;" onclick="copyUnbilled()">📋 未請求リストをコピー</button>
+        </div>
+      </div>
+      <div id="bill-list"></div>
     </div>
     <div class="board-footer">
       <div class="legend" id="legend"></div>
@@ -461,8 +508,10 @@ function setView(m){
 function applyViewTabs(){
   document.getElementById('vtab-row').classList.toggle('active',viewMode==='row');
   document.getElementById('vtab-month').classList.toggle('active',viewMode==='month');
+  document.getElementById('vtab-bill').classList.toggle('active',viewMode==='bill');
   document.getElementById('cal-wrap-row').style.display=viewMode==='row'?'':'none';
   document.getElementById('mg-wrap').style.display=viewMode==='month'?'':'none';
+  document.getElementById('bill-wrap').style.display=viewMode==='bill'?'':'none';
 }
 applyViewTabs();
 
@@ -473,6 +522,7 @@ function resetConfig(){
   if(!confirm('データを再読み込みしますか？'))return;
   if(unsub)unsub();
   if(unsubPhotos)unsubPhotos();
+  if(unsubBilling)unsubBilling();
   location.reload();
 }
 
@@ -506,6 +556,8 @@ function startListener(){
   },err=>{setStatus('⚠ 接続エラー: '+err.message,'err');});
   // 写真は表示中の月だけ読み込む（高速化）
   startPhotoListener();
+  // 請求ステータス（請求チェック用）
+  startBillingListener();
   // 連絡事項は予定表示後に読み込み
   setTimeout(startNoticeListener,300);
 }
@@ -572,6 +624,7 @@ function renderCalendar(){
   document.getElementById('disp-year').textContent=curYear;
   document.getElementById('disp-month').textContent=curMonth+'月';
   if(viewMode==='month'){renderMonthGrid();updateLegend();return;}
+  if(viewMode==='bill'){renderBilling();updateLegend();return;}
   const today=todayStr();
   const evArr=Object.values(events);
   const phArr=Object.values(photos).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
@@ -765,6 +818,123 @@ function renderMonthGrid(){
   }
   html+='</tbody>';
   document.getElementById('mg-table').innerHTML=html;
+}
+
+// ===== 請求チェック =====
+// 請求の対象にする担当行（休み・縫製・写真は請求と無関係なので含めない）
+const BILL_ROWS=['吉成','穐元','真壁','敏美','その他'];
+// 状態：未設定=未請求。billed=請求済み、exempt=対象外（入札・会議など）
+let billing={},unsubBilling=null;
+// 現場キー：担当者＋正規化した現場名。normTitleが「設営／撤去／積込」等を落とすので
+// 「都路灯まつり設営」と「都路灯まつり撤去」は同じ1現場＝1請求としてまとまる。
+function billKey(person,title){return encodeURIComponent(person+'|'+normTitle(title));}
+
+function startBillingListener(){
+  if(unsubBilling)unsubBilling();
+  unsubBilling=db.collection('billing').onSnapshot(snap=>{
+    billing={};
+    snap.forEach(doc=>{billing[doc.id]=doc.data();});
+    if(viewMode==='bill')renderBilling();
+  },()=>{});
+}
+
+// その月の予定を「現場」単位にまとめる
+function buildBillJobs(){
+  const mStart=toDS(curYear,curMonth,1),mEnd=toDS(curYear,curMonth,getDays(curYear,curMonth));
+  const jobs={};
+  Object.values(events)
+    .filter(e=>BILL_ROWS.includes(e.person)&&e.dateS<=mEnd&&(e.dateE||e.dateS)>=mStart)
+    .forEach(e=>{
+      const key=billKey(e.person,e.title);
+      if(!jobs[key])jobs[key]={key,person:e.person,title:e.title,first:e.dateS,last:e.dateE||e.dateS,count:0};
+      const j=jobs[key];
+      j.count++;
+      if(e.dateS<j.first){j.first=e.dateS;j.title=e.title;} // 一番早い予定の名前を代表にする
+      if((e.dateE||e.dateS)>j.last)j.last=e.dateE||e.dateS;
+    });
+  return Object.values(jobs).sort((a,b)=>
+    (BILL_ROWS.indexOf(a.person)-BILL_ROWS.indexOf(b.person))||(a.first<b.first?-1:a.first>b.first?1:0));
+}
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function billStatus(key){const b=billing[key];return (b&&b.status)||'unbilled';}
+function mdLabel(ds){const p=ds.split('-');return `${Number(p[1])}/${Number(p[2])}`;}
+function billRange(j){return j.first===j.last?mdLabel(j.first):`${mdLabel(j.first)}〜${mdLabel(j.last)}`;}
+
+function renderBilling(){
+  const jobs=buildBillJobs();
+  const hideDone=document.getElementById('bill-hide-done').checked;
+  const target=jobs.filter(j=>billStatus(j.key)!=='exempt');
+  const unbilled=target.filter(j=>billStatus(j.key)==='unbilled');
+  const billed=target.filter(j=>billStatus(j.key)==='billed');
+  const pct=target.length?Math.round(billed.length/target.length*100):0;
+
+  document.getElementById('bill-tiles').innerHTML=
+    `<div class="bt"><div class="l">請求対象の現場</div><div class="n">${target.length}<span>件</span></div></div>`+
+    `<div class="bt warn"><div class="l">未請求</div><div class="n">${unbilled.length}<span>件</span></div></div>`+
+    `<div class="bt done"><div class="l">請求済み</div><div class="n">${billed.length}<span>件</span></div></div>`+
+    `<div class="bt"><div class="l">進捗</div><div class="n">${pct}<span>%</span></div></div>`;
+
+  let html='';
+  BILL_ROWS.forEach(p=>{
+    let list=jobs.filter(j=>j.person===p);
+    if(hideDone)list=list.filter(j=>billStatus(j.key)==='unbilled');
+    if(!list.length)return;
+    const un=list.filter(j=>billStatus(j.key)==='unbilled').length;
+    const col=(RCOLORS[p]||{}).bd||'#999';
+    html+=`<div class="bgrp"><div class="bgrp-h"><span class="pc" style="background:${col}"></span>${p}`+
+      `<span class="cnt">未請求 ${un} / ${list.length}件</span></div>`;
+    list.forEach(j=>{
+      const st=billStatus(j.key);
+      html+=`<div class="bitem st-${st}"><span class="sdot"></span>`+
+        `<span class="nm">${esc(j.title)}</span>`+
+        `<span class="dt">${billRange(j)}</span>`+
+        (j.count>1?`<span class="cnt2">予定${j.count}件</span>`:'')+
+        `<span class="acts">`+
+        `<button class="bbtn ${st==='billed'?'on-billed':''}" onclick="setBill('${j.key}','billed')">${st==='billed'?'✓ 請求済み':'請求済みにする'}</button>`+
+        `<button class="bbtn ${st==='exempt'?'on-exempt':''}" onclick="setBill('${j.key}','exempt')">対象外</button>`+
+        `</span></div>`;
+    });
+    html+='</div>';
+  });
+  if(!html)html='<div class="bill-empty">この月に請求対象の予定はありません。</div>';
+  else if(!unbilled.length)html='<div class="bill-empty">🎉 未請求はありません。今月の出し漏れなし！</div>'+html;
+  html+='<div class="bill-note">「設営」「撤去」など同じ現場名の予定は1件の現場（＝1請求）としてまとめています。'+
+    '請求に関係ない予定（入札・会議など）は「対象外」を押すと集計から外れます。もう一度押すと戻ります。<br>'+
+    '縫製はこの一覧に含まれません。</div>';
+  document.getElementById('bill-list').innerHTML=html;
+}
+
+// 同じボタンをもう一度押すと未請求に戻る（トグル）
+async function setBill(key,status){
+  const now=billStatus(key);
+  const next=(now===status)?'unbilled':status;
+  billing[key]={...(billing[key]||{}),status:next}; // 先に画面へ反映
+  renderBilling();
+  try{
+    await db.collection('billing').doc(key).set({
+      status:next,ym:`${curYear}-${pad(curMonth)}`,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    },{merge:true});
+  }catch(e){alert('保存に失敗しました: '+e.message);}
+}
+
+function copyUnbilled(){
+  const jobs=buildBillJobs().filter(j=>billStatus(j.key)==='unbilled');
+  if(!jobs.length){alert('未請求はありません。');return;}
+  const lines=[`【${curYear}年${curMonth}月 未請求リスト】`];
+  BILL_ROWS.forEach(p=>{
+    const list=jobs.filter(j=>j.person===p);
+    if(!list.length)return;
+    lines.push(`■${p}`);
+    list.forEach(j=>lines.push(`　・${j.title}（${billRange(j)}）`));
+  });
+  lines.push(`合計 ${jobs.length}件`);
+  const txt=lines.join('\n');
+  const done=()=>alert('未請求リストをコピーしました。');
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done,()=>prompt('コピーしてください',txt));
+  }else prompt('コピーしてください',txt);
 }
 
 // 月間カレンダー：日をタップ → その日の予定一覧
@@ -1256,6 +1426,9 @@ async function downloadBackup(includePhotos){
   evSnap.forEach(d=>data.events.push({id:d.id,...d.data()}));
   const ntSnap=await db.collection('notices').get();
   ntSnap.forEach(d=>data.notices.push({id:d.id,...d.data()}));
+  data.billing=[];
+  const blSnap=await db.collection('billing').get();
+  blSnap.forEach(d=>data.billing.push({id:d.id,...d.data()}));
   if(includePhotos){
     data.photos=[];
     const phSnap=await db.collection('photos').get();
