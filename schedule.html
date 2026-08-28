@@ -1318,7 +1318,9 @@ function toggleNotice(){
 
 function toggleNForm(){
   const f=document.getElementById('n-form');
-  const show=f.style.display==='none';
+  // 実際に表示されているかで判定する（読み込み直後はインラインstyleが空のため、
+  // style.displayだけを見ると1回目のクリックで開かない）
+  const show=getComputedStyle(f).display==='none';
   if(show){
     // 新規モード
     editingNoticeId=null;
