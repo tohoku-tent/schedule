@@ -1012,15 +1012,45 @@ async function handlePhotoFiles(input){
   try{
     for(const file of files){
       const url=await compressImage(file);
-      await db.collection('photos').add({
+      const ref=await db.collection('photos').add({
         url,
         name:file.name,
         dateKey:pendingDate,
         timestamp:Date.now(),
       });
+      // 拡大して読めるよう高画質版も別に保存（表の小さい写真は従来の軽い画像のまま）
+      try{
+        const hd=await compressHD(file);
+        if(hd)await db.collection('photos_hd').doc(ref.id).set({url:hd});
+      }catch(e){console.warn('高画質版の保存に失敗',e);}
     }
   }catch(e){alert('写真の保存に失敗しました: '+e.message);}
   badge.classList.remove('show');
+}
+
+// 高画質版：Firestoreの1件あたりの上限（約1MB）に収まるまで画質→サイズの順に下げる
+const HD_LIMIT=950000;
+function compressHD(file){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    const ou=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(ou);
+      for(const maxW of [2400,2000,1600]){
+        const r=Math.min(1,maxW/Math.max(img.width,img.height));
+        const c=document.createElement('canvas');
+        c.width=Math.round(img.width*r);c.height=Math.round(img.height*r);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        for(const q of [0.82,0.72,0.62]){
+          const u=c.toDataURL('image/jpeg',q);
+          if(u.length<=HD_LIMIT){res(u);return;}
+        }
+      }
+      res(null); // どうしても収まらない場合は高画質版なし（従来の写真だけ）
+    };
+    img.onerror=rej;
+    img.src=ou;
+  });
 }
 
 function compressImage(file,maxW=800,q=0.60){
@@ -1053,13 +1083,26 @@ function openLB(photoId,ds){
   document.getElementById('photo-lb').classList.add('open');
 }
 
+const hdCache={}; // 写真ID → 高画質版のURL（なければnull）
 function showLBPhoto(){
   const p=lbPhotos[lbIdx];
   if(!p)return;
-  document.getElementById('plb-img').src=p.url||'';
+  const imgEl=document.getElementById('plb-img');
+  // まず軽い画像ですぐ表示し、高画質版があれば後から差し替える
+  imgEl.src=(hdCache[p.id])||p.url||'';
   // キャプション
   const capEl=document.getElementById('plb-cap');
-  capEl.textContent=(p.name||'')+(lbPhotos.length>1?'　'+( lbIdx+1)+' / '+lbPhotos.length:'');
+  const baseCap=(p.name||'')+(lbPhotos.length>1?'　'+( lbIdx+1)+' / '+lbPhotos.length:'');
+  capEl.textContent=baseCap+(hdCache[p.id]?'　［高画質］':'');
+  if(!(p.id in hdCache)){
+    db.collection('photos_hd').doc(p.id).get().then(doc=>{
+      hdCache[p.id]=doc.exists?doc.data().url:null;
+      if(hdCache[p.id]&&lbPhotos[lbIdx]&&lbPhotos[lbIdx].id===p.id){
+        imgEl.src=hdCache[p.id];
+        capEl.textContent=baseCap+'　［高画質］';
+      }
+    }).catch(()=>{});
+  }
   // ドットインジケーター
   let dotEl=document.getElementById('plb-dots');
   if(!dotEl){
@@ -1099,6 +1142,8 @@ async function deleteCurrentPhoto(){
   if(!confirm('この写真を削除しますか？'))return;
   try{
     await db.collection('photos').doc(p.id).delete();
+    db.collection('photos_hd').doc(p.id).delete().catch(()=>{}); // 高画質版も削除
+    delete hdCache[p.id];
     // 削除後：残りの写真があればそのまま表示、なければ閉じる
     lbPhotos.splice(lbIdx,1);
     if(lbPhotos.length===0){
@@ -1136,6 +1181,7 @@ document.addEventListener('keydown',e=>{
   }
   function reset(){
     scale=1;tx=0;ty=0;apply();
+    img.style.cursor='';
     img.style.transition='transform .2s';
     setTimeout(()=>img.style.transition='',200);
   }
@@ -1206,8 +1252,32 @@ document.addEventListener('keydown',e=>{
     e.preventDefault();
     scale=Math.min(5,Math.max(1,scale-e.deltaY*0.002));
     if(scale===1){tx=0;ty=0;}
+    img.style.cursor=scale>1?'grab':'';
     apply();
   },{passive:false});
+
+  // PC：拡大中はドラッグで移動、ダブルクリックで拡大／元に戻す
+  let dragging=false,dragX=0,dragY=0;
+  img.addEventListener('mousedown',e=>{
+    if(scale<=1)return;
+    e.preventDefault();
+    dragging=true;dragX=e.clientX-tx;dragY=e.clientY-ty;
+    img.style.cursor='grabbing';
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    tx=e.clientX-dragX;ty=e.clientY-dragY;apply();
+  });
+  window.addEventListener('mouseup',()=>{
+    if(!dragging)return;
+    dragging=false;img.style.cursor='grab';
+  });
+  img.addEventListener('dblclick',e=>{
+    e.preventDefault();
+    if(scale>1){reset();img.style.cursor='';}
+    else{scale=2.5;img.style.transition='transform .2s';apply();setTimeout(()=>img.style.transition='',200);img.style.cursor='grab';}
+  });
+  img.addEventListener('dragstart',e=>e.preventDefault());
 })();
 
 // ---- 予定モーダル ----
@@ -1444,6 +1514,9 @@ async function downloadBackup(includePhotos){
     data.photos=[];
     const phSnap=await db.collection('photos').get();
     phSnap.forEach(d=>data.photos.push({id:d.id,...d.data()}));
+    data.photos_hd=[];
+    const hdSnap=await db.collection('photos_hd').get();
+    hdSnap.forEach(d=>data.photos_hd.push({id:d.id,...d.data()}));
   }
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
   const a=document.createElement('a');
