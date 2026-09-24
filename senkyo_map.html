@@ -12,6 +12,7 @@ body{background:#f4f4f4;}
 #header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 #header-top h1{font-size:15px;font-weight:600;}
 #header-top p{font-size:11px;opacity:0.8;margin-top:1px;}
+#ver{background:rgba(255,255,255,0.25);border-radius:6px;padding:1px 6px;font-size:10px;margin-left:4px;}
 #kml-btn,#reset-btn{background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.5);color:#fff;padding:5px 10px;border-radius:8px;font-size:12px;cursor:pointer;white-space:nowrap;}
 #kml-btn:hover,#reset-btn:hover{background:rgba(255,255,255,0.3);}
 #header-btns{display:flex;gap:6px;flex-shrink:0;}
@@ -84,7 +85,7 @@ body{background:#f4f4f4;}
 
 <div id="header">
   <div id="header-top">
-    <div><h1>選挙看板 設置管理マップ</h1><p>ITO 2024.10 — wada① エリア</p></div>
+    <div><h1>選挙看板 設置管理マップ</h1><p>ITO 2024.10 — wada① エリア <span id="ver">v9 保存対応</span></p></div>
     <div id="header-btns">
       <button id="reset-btn" onclick="resetStatus()">↺ リセット</button>
       <button id="kml-btn" onclick="openKmlModal()">📂 KML更新</button>
