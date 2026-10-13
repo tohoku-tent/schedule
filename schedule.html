@@ -233,6 +233,7 @@ td.rh.photo-rh{background:#e8f5e9;color:#2e7d32;font-size:10px;line-height:1.4;}
 .ph-thumbs{display:flex;gap:2px;align-items:center;flex-wrap:nowrap;overflow:hidden;}
 .ph-thumb{width:40px;height:44px;object-fit:cover;border-radius:4px;border:1.5px solid #c8e6c9;cursor:pointer;transition:transform .15s,box-shadow .15s;flex-shrink:0;}
 .ph-thumb:hover{transform:scale(1.1);box-shadow:0 2px 8px rgba(0,0,0,.25);}
+.ph-pdf{display:inline-flex;align-items:center;justify-content:center;background:#ffebee;border-color:#ef9a9a;font-size:20px;}
 .ph-more{display:inline-flex;align-items:center;justify-content:center;width:22px;height:44px;background:#b2dfdb;border-radius:4px;font-size:10px;font-weight:700;color:#004d40;cursor:pointer;flex-shrink:0;}
 .ph-more:hover{background:#80cbc4;}
 .ph-add{display:inline-flex;align-items:center;justify-content:center;width:22px;height:44px;background:transparent;border:1.5px dashed #aaa;border-radius:4px;font-size:14px;color:#aaa;cursor:pointer;flex-shrink:0;transition:all .15s;}
@@ -430,15 +431,20 @@ td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
   <div class="plb-nav">
     <span class="plb-arr" id="plb-prev" onclick="lbNav(-1)">‹</span>
     <img class="plb-img" id="plb-img" src="" alt="">
+    <div id="plb-pdf" style="display:none;background:#fff;border-radius:10px;padding:28px 24px;text-align:center;min-width:220px;max-width:80vw;">
+      <div style="font-size:56px;line-height:1;">📄</div>
+      <div id="plb-pdf-name" style="margin:10px 0 14px;font-size:13px;word-break:break-all;color:#333;"></div>
+      <button id="plb-pdf-open" onclick="openPdf()" style="background:#1976d2;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:14px;cursor:pointer;">PDFを開く</button>
+    </div>
     <span class="plb-arr" id="plb-next" onclick="lbNav(1)">›</span>
   </div>
   <div class="plb-cap" id="plb-cap"></div>
-  <button class="plb-del" onclick="deleteCurrentPhoto()">🗑 この写真を削除</button>
+  <button class="plb-del" onclick="deleteCurrentPhoto()">🗑 これを削除</button>
   <div style="color:#888;font-size:11px;margin-top:2px;">ピンチ・ダブルタップで拡大　／　背景タップで閉じる</div>
 </div>
 
 <!-- 隠しファイルinput -->
-<input type="file" id="photo-file-input" accept="image/*" multiple style="display:none" onchange="handlePhotoFiles(this)">
+<input type="file" id="photo-file-input" accept="image/*,application/pdf" multiple style="display:none" onchange="handlePhotoFiles(this)">
 
 <div class="uploading-badge" id="uploading-badge">📤 アップロード中...</div>
 <div class="tooltip" id="tooltip"></div>
@@ -700,7 +706,11 @@ function renderCalendar(){
       const p=dayPhotos[0];
       const safeUrl=p.url?p.url.replace(/'/g,"\\'"):'';
       const safeName=(p.name||'').replace(/'/g,"\\'");
-      html+=`<img class="ph-thumb" src="${safeUrl}" onclick="event.stopPropagation();openLB('${p.id}','${ds}')" title="${safeName}">`;
+      if(p.type==='pdf'){
+        html+=`<div class="ph-thumb ph-pdf" onclick="event.stopPropagation();openLB('${p.id}','${ds}')" title="${safeName}">📄</div>`;
+      }else{
+        html+=`<img class="ph-thumb" src="${safeUrl}" onclick="event.stopPropagation();openLB('${p.id}','${ds}')" title="${safeName}">`;
+      }
       if(dayPhotos.length>1){
         html+=`<span class="ph-more" onclick="event.stopPropagation();openLB('${dayPhotos[1].id}','${ds}')">+${dayPhotos.length-1}</span>`;
       }
@@ -965,7 +975,7 @@ function mgOpenDay(ds){
     html+=`<div class="mgd-item ${cls}" onclick="document.getElementById('mg-day-modal').classList.remove('open');editEvent('${ev.id}')"><b>${ev.person}</b>：${ev.title}${ev.memo?'　'+ev.memo:''}</div>`;
   });
   if(phArr.length){
-    html+=`<div class="mgd-item" style="background:#e8f5e9;border-left:3px solid #22c55e;" onclick="document.getElementById('mg-day-modal').classList.remove('open');openLB('${phArr[0].id}','${ds}')">📷 写真 ${phArr.length}枚を見る</div>`;
+    html+=`<div class="mgd-item" style="background:#e8f5e9;border-left:3px solid #22c55e;" onclick="document.getElementById('mg-day-modal').classList.remove('open');openLB('${phArr[0].id}','${ds}')">📷 写真・PDF ${phArr.length}件を見る</div>`;
   }
   if(!html)html='<div style="font-size:12px;color:var(--mute);padding:8px 0;">予定はありません</div>';
   document.getElementById('mg-day-list').innerHTML=html;
@@ -1005,12 +1015,17 @@ function pickPhotoForDate(ds){
 }
 
 async function handlePhotoFiles(input){
-  const files=Array.from(input.files).filter(f=>f.type.startsWith('image/'));
+  const files=Array.from(input.files).filter(f=>f.type.startsWith('image/')||f.type==='application/pdf');
   if(!files.length||!pendingDate)return;
   const badge=document.getElementById('uploading-badge');
   badge.classList.add('show');
   try{
     for(const file of files){
+      if(file.type==='application/pdf'){
+        try{await savePdf(file,pendingDate);}
+        catch(e){alert('PDFの保存に失敗しました（'+file.name+'）: '+e.message);}
+        continue;
+      }
       const url=await compressImage(file);
       const ref=await db.collection('photos').add({
         url,
@@ -1026,6 +1041,49 @@ async function handlePhotoFiles(input){
     }
   }catch(e){alert('写真の保存に失敗しました: '+e.message);}
   badge.classList.remove('show');
+}
+
+// ---- PDF機能：base64に変換し、Firestoreの1件上限(約1MB)に収まるよう分割して保存 ----
+const PDF_MAX_BYTES=5*1024*1024;
+const PDF_CHUNK=700000;
+async function savePdf(file,dateKey){
+  if(file.size>PDF_MAX_BYTES)throw new Error('サイズが大きすぎます（上限5MB）');
+  const dataUrl=await new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);
+    r.readAsDataURL(file);
+  });
+  const b64=dataUrl.slice(dataUrl.indexOf(',')+1);
+  const n=Math.ceil(b64.length/PDF_CHUNK);
+  const ref=db.collection('photos').doc();
+  // 本体を先に保存し、最後に一覧用の記録を作る（途中失敗で壊れた項目が表示されないように）
+  for(let i=0;i<n;i++){
+    await db.collection('pdf_chunks').doc(ref.id+'_'+i).set({data:b64.slice(i*PDF_CHUNK,(i+1)*PDF_CHUNK)});
+  }
+  await ref.set({type:'pdf',name:file.name,size:file.size,chunks:n,dateKey,timestamp:Date.now()});
+}
+
+async function openPdf(){
+  const p=lbPhotos[lbIdx];
+  if(!p||p.type!=='pdf')return;
+  const btn=document.getElementById('plb-pdf-open');
+  // ポップアップ規制を避けるため、先にタブを開いておく
+  const w=window.open('','_blank');
+  btn.disabled=true;btn.textContent='読込中...';
+  try{
+    const docs=await Promise.all(Array.from({length:p.chunks},(_,i)=>db.collection('pdf_chunks').doc(p.id+'_'+i).get()));
+    if(docs.some(d=>!d.exists))throw new Error('データが見つかりません');
+    const bin=atob(docs.map(d=>d.data().data).join(''));
+    const bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+    if(w){w.location.href=url;}
+    else{const a=document.createElement('a');a.href=url;a.download=p.name||'file.pdf';a.click();}
+  }catch(e){
+    if(w)w.close();
+    alert('PDFを開けませんでした: '+e.message);
+  }
+  btn.disabled=false;btn.textContent='PDFを開く';
 }
 
 // 高画質版：Firestoreの1件あたりの上限（約1MB）に収まるまで画質→サイズの順に下げる
@@ -1088,6 +1146,19 @@ function showLBPhoto(){
   const p=lbPhotos[lbIdx];
   if(!p)return;
   const imgEl=document.getElementById('plb-img');
+  const pdfEl=document.getElementById('plb-pdf');
+  const isPdf=p.type==='pdf';
+  imgEl.style.display=isPdf?'none':'';
+  pdfEl.style.display=isPdf?'block':'none';
+  if(isPdf){
+    document.getElementById('plb-pdf-name').textContent=(p.name||'')+(p.size?'（'+Math.round(p.size/1024)+'KB）':'');
+    document.getElementById('plb-cap').textContent=lbPhotos.length>1?(lbIdx+1)+' / '+lbPhotos.length:'';
+    document.getElementById('plb-prev').style.visibility=lbIdx>0?'visible':'hidden';
+    document.getElementById('plb-next').style.visibility=lbIdx<lbPhotos.length-1?'visible':'hidden';
+    const dEl=document.getElementById('plb-dots');
+    if(dEl)dEl.style.display='none';
+    return;
+  }
   // まず軽い画像ですぐ表示し、高画質版があれば後から差し替える
   imgEl.src=(hdCache[p.id])||p.url||'';
   // キャプション
@@ -1139,9 +1210,12 @@ function closeLB(){
 async function deleteCurrentPhoto(){
   const p=lbPhotos[lbIdx];
   if(!p)return;
-  if(!confirm('この写真を削除しますか？'))return;
+  if(!confirm(p.type==='pdf'?'このPDFを削除しますか？':'この写真を削除しますか？'))return;
   try{
     await db.collection('photos').doc(p.id).delete();
+    if(p.type==='pdf'){
+      for(let i=0;i<(p.chunks||0);i++)db.collection('pdf_chunks').doc(p.id+'_'+i).delete().catch(()=>{});
+    }
     db.collection('photos_hd').doc(p.id).delete().catch(()=>{}); // 高画質版も削除
     delete hdCache[p.id];
     // 削除後：残りの写真があればそのまま表示、なければ閉じる
