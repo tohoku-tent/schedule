@@ -443,6 +443,17 @@ td.pc:not(:has(.ph-thumbs .ph-thumb)){cursor:pointer;}
   <div style="color:#888;font-size:11px;margin-top:2px;">ピンチ・ダブルタップで拡大　／　背景タップで閉じる</div>
 </div>
 
+<!-- PDFビューア -->
+<div id="pdf-viewer" style="display:none;position:fixed;inset:0;background:#333;z-index:600;flex-direction:column;">
+  <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#222;color:#fff;font-size:13px;">
+    <span id="pdfv-title" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <a id="pdfv-dl" style="color:#90caf9;text-decoration:none;">保存</a>
+    <span onclick="closePdfViewer()" style="font-size:26px;line-height:1;cursor:pointer;padding:0 6px;">×</span>
+  </div>
+  <div id="pdfv-pages" style="flex:1;overflow:auto;padding:8px;-webkit-overflow-scrolling:touch;"></div>
+</div>
+<style>#pdf-viewer.open{display:flex !important;}</style>
+
 <!-- 隠しファイルinput -->
 <input type="file" id="photo-file-input" accept="image/*,application/pdf" multiple style="display:none" onchange="handlePhotoFiles(this)">
 
@@ -1067,8 +1078,6 @@ async function openPdf(){
   const p=lbPhotos[lbIdx];
   if(!p||p.type!=='pdf')return;
   const btn=document.getElementById('plb-pdf-open');
-  // ポップアップ規制を避けるため、先にタブを開いておく
-  const w=window.open('','_blank');
   btn.disabled=true;btn.textContent='読込中...';
   try{
     const docs=await Promise.all(Array.from({length:p.chunks},(_,i)=>db.collection('pdf_chunks').doc(p.id+'_'+i).get()));
@@ -1076,14 +1085,55 @@ async function openPdf(){
     const bin=atob(docs.map(d=>d.data().data).join(''));
     const bytes=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
-    const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
-    if(w){w.location.href=url;}
-    else{const a=document.createElement('a');a.href=url;a.download=p.name||'file.pdf';a.click();}
+    await showPdfViewer(bytes,p.name);
   }catch(e){
-    if(w)w.close();
     alert('PDFを開けませんでした: '+e.message);
   }
   btn.disabled=false;btn.textContent='PDFを開く';
+}
+
+// アプリ内PDFビューア（pdf.jsで全ページをcanvasに描画。ブラウザのPDF表示機能に依存しない）
+const PDFJS_BASE='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+let pdfjsPromise=null;
+function loadPdfJs(){
+  if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  if(!pdfjsPromise)pdfjsPromise=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src=PDFJS_BASE+'pdf.min.js';
+    s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_BASE+'pdf.worker.min.js';res(window.pdfjsLib);};
+    s.onerror=()=>{pdfjsPromise=null;rej(new Error('PDF表示用の部品を読み込めません（通信を確認してください）'));};
+    document.head.appendChild(s);
+  });
+  return pdfjsPromise;
+}
+let pdfBlobUrl=null;
+async function showPdfViewer(bytes,name){
+  const lib=await loadPdfJs();
+  const pdf=await lib.getDocument({data:bytes.slice()}).promise;
+  if(pdfBlobUrl)URL.revokeObjectURL(pdfBlobUrl);
+  pdfBlobUrl=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+  const dl=document.getElementById('pdfv-dl');
+  dl.href=pdfBlobUrl;dl.download=name||'file.pdf';
+  document.getElementById('pdfv-title').textContent=name||'PDF';
+  const pages=document.getElementById('pdfv-pages');
+  pages.innerHTML='';
+  document.getElementById('pdf-viewer').classList.add('open');
+  const width=Math.min(pages.clientWidth-16,1000);
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  for(let n=1;n<=pdf.numPages;n++){
+    const page=await pdf.getPage(n);
+    const base=page.getViewport({scale:1});
+    const vp=page.getViewport({scale:width/base.width*dpr});
+    const c=document.createElement('canvas');
+    c.width=vp.width;c.height=vp.height;
+    c.style.cssText='width:'+(vp.width/dpr)+'px;height:'+(vp.height/dpr)+'px;background:#fff;margin:0 auto 8px;display:block;box-shadow:0 1px 6px rgba(0,0,0,.4);';
+    pages.appendChild(c);
+    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+  }
+}
+function closePdfViewer(){
+  document.getElementById('pdf-viewer').classList.remove('open');
+  document.getElementById('pdfv-pages').innerHTML='';
 }
 
 // 高画質版：Firestoreの1件あたりの上限（約1MB）に収まるまで画質→サイズの順に下げる
