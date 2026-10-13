@@ -1077,20 +1077,34 @@ async function savePdf(file,dateKey){
 async function openPdf(){
   const p=lbPhotos[lbIdx];
   if(!p||p.type!=='pdf')return;
-  const btn=document.getElementById('plb-pdf-open');
-  btn.disabled=true;btn.textContent='読込中...';
+  // ビューアを先に開き、進行状況を見せる（待ち時間の体感を短くする）
+  prepPdfViewer(p.name);
+  const status=document.getElementById('pdfv-status');
   try{
-    const docs=await Promise.all(Array.from({length:p.chunks},(_,i)=>db.collection('pdf_chunks').doc(p.id+'_'+i).get()));
-    if(docs.some(d=>!d.exists))throw new Error('データが見つかりません');
-    const bin=atob(docs.map(d=>d.data().data).join(''));
-    const bytes=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    let bytes=pdfBytesCache[p.id];
+    if(!bytes){
+      let got=0;
+      status.textContent='データを取得中... 0/'+p.chunks;
+      const parts=await Promise.all(Array.from({length:p.chunks},(_,i)=>
+        db.collection('pdf_chunks').doc(p.id+'_'+i).get().then(d=>{
+          if(!d.exists)throw new Error('データが見つかりません');
+          status.textContent='データを取得中... '+(++got)+'/'+p.chunks;
+          return d.data().data;
+        })));
+      status.textContent='変換中...';
+      await new Promise(r=>setTimeout(r,0)); // 表示を更新させる
+      const bin=atob(parts.join(''));
+      bytes=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+      pdfBytesCache[p.id]=bytes;
+    }
     await showPdfViewer(bytes,p.name);
   }catch(e){
+    closePdfViewer();
     alert('PDFを開けませんでした: '+e.message);
   }
-  btn.disabled=false;btn.textContent='PDFを開く';
 }
+const pdfBytesCache={}; // 同じPDFを開き直すときは再取得しない
 
 // アプリ内PDFビューア（pdf.jsで全ページをcanvasに描画。ブラウザのPDF表示機能に依存しない）
 const PDFJS_BASE='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
@@ -1107,19 +1121,29 @@ function loadPdfJs(){
   return pdfjsPromise;
 }
 let pdfBlobUrl=null;
+// ビューアの枠だけ先に開く
+function prepPdfViewer(name){
+  document.getElementById('pdfv-title').textContent=name||'PDF';
+  document.getElementById('pdfv-dl').removeAttribute('href');
+  document.getElementById('pdfv-pages').innerHTML='<div id="pdfv-status" style="color:#ddd;text-align:center;padding:40px 0;font-size:14px;">読込中...</div>';
+  document.getElementById('pdf-viewer').classList.add('open');
+}
+// アプリ起動後、手が空いたときにpdf.jsを先読みしておく
+setTimeout(()=>{loadPdfJs().catch(()=>{});},4000);
+
 async function showPdfViewer(bytes,name){
+  const status=document.getElementById('pdfv-status');
+  if(status)status.textContent='表示の準備中...';
   const lib=await loadPdfJs();
   const pdf=await lib.getDocument({data:bytes.slice()}).promise;
   if(pdfBlobUrl)URL.revokeObjectURL(pdfBlobUrl);
   pdfBlobUrl=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
   const dl=document.getElementById('pdfv-dl');
   dl.href=pdfBlobUrl;dl.download=name||'file.pdf';
-  document.getElementById('pdfv-title').textContent=name||'PDF';
   const pages=document.getElementById('pdfv-pages');
   pages.innerHTML='';
-  document.getElementById('pdf-viewer').classList.add('open');
   const width=Math.min(pages.clientWidth-16,1000);
-  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const dpr=Math.min(window.devicePixelRatio||1,1.5);
   for(let n=1;n<=pdf.numPages;n++){
     const page=await pdf.getPage(n);
     const base=page.getViewport({scale:1});
