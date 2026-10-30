@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tohoku-tent-schedule-v18';
+const CACHE_NAME = 'tohoku-tent-schedule-v19';
 const URLS_TO_CACHE = [
   '/schedule/schedule.html'
 ];
